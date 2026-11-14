@@ -1,8 +1,7 @@
 import { f_n_motor__axis, o_state, f_save_calibration, f_save_setting__debounced, f_send_wsmsg_with_response } from './index.js';
 import { f_o_wsmsg } from './constructors.module.js';
 import { f_save_image } from './o_capture.module.js';
-import { f_o_camera_geometry, f_el_camera_frame, f_o_camera_geometry_snapshot, f_b_camera_geometry_matches } from './camera_frame.module.js';
-import { f_o_video_rect } from './training_workflow.module.js';
+import { f_o_camera_geometry, f_el_camera_frame, f_o_camera_geometry_snapshot, f_b_camera_geometry_matches, f_o_video_rect } from './camera_frame.module.js';
 import {
     N_PX__LINE_MIN, f_n_um__known, f_n_px__distance, f_n_px__path, f_o_scale, f_n_pct__error, f_s_viewbox__line,
     f_o_point__camera, f_o_point__window, f_s_number, f_s_length, f_n_um__grid, f_o_ruler, a_o_size_reference,

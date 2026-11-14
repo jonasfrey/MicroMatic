@@ -19,16 +19,6 @@ let f_a_plane = function (n_start, n_end, n_count) {
         (_, n_idx) => Math.round(n_start + (n_end - n_start) * n_idx / (n_count - 1)),
     );
 };
-let f_o_video_rect = function (o_rect, n_x, n_y) {
-    if (!(n_x > 0 && n_y > 0 && o_rect.width > 0 && o_rect.height > 0)) return null;
-    let n_scale = Math.min(o_rect.width / n_x, o_rect.height / n_y);
-    return {
-        n_x: o_rect.left + (o_rect.width - n_x * n_scale) / 2,
-        n_y: o_rect.top + (o_rect.height - n_y * n_scale) / 2,
-        n_scl_x: n_x * n_scale,
-        n_scl_y: n_y * n_scale,
-    };
-};
 // Return to the previous focus on success and recoverable failure. Explicit stop
 // or connection loss suppresses the return move, so Stop cannot restart motion.
 let f_focus_sweep = async function ({ a_n_plane, n_previous, f_move, f_frame, f_check }) {
@@ -44,4 +34,4 @@ let f_focus_sweep = async function ({ a_n_plane, n_previous, f_move, f_frame, f_
         await f_move(n_previous);
     }
 };
-export { f_a_grid, f_a_plane, f_focus_sweep, f_o_video_rect };
+export { f_a_grid, f_a_plane, f_focus_sweep };

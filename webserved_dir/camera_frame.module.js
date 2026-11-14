@@ -74,6 +74,18 @@ let f_el_camera_frame = function(el_video = document.getElementById('webcamVideo
     return el_canvas__frame;
 };
 
+// Where an object-fit: contain video of n_x × n_y pixels lands inside its box.
+let f_o_video_rect = function (o_rect, n_x, n_y) {
+    if (!(n_x > 0 && n_y > 0 && o_rect.width > 0 && o_rect.height > 0)) return null;
+    let n_scale = Math.min(o_rect.width / n_x, o_rect.height / n_y);
+    return {
+        n_x: o_rect.left + (o_rect.width - n_x * n_scale) / 2,
+        n_y: o_rect.top + (o_rect.height - n_y * n_scale) / 2,
+        n_scl_x: n_x * n_scale,
+        n_scl_y: n_y * n_scale,
+    };
+};
+
 export { f_set_camera_crop_provider, f_s_camera_crop_key, f_b_camera_crop_valid,
     f_o_camera_geometry, f_b_camera_crop_active, f_el_camera_frame,
-    f_o_camera_geometry_snapshot, f_b_camera_geometry_matches };
+    f_o_camera_geometry_snapshot, f_b_camera_geometry_matches, f_o_video_rect };

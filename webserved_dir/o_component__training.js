@@ -1,4 +1,4 @@
-import { f_o_camera_geometry } from './camera_frame.module.js';
+import { f_o_camera_geometry, f_o_video_rect } from './camera_frame.module.js';
 import { f_o_sam_state, o_sam_method } from './training_sam.module.js';
 import {
     f_o_box_from_crop,
@@ -12,7 +12,7 @@ import { f_n_motor__axis, f_send_esp_stop_all, f_set_mouse_jog, o_state } from '
 import { f_o_capture__frame } from './o_capture.module.js';
 import { f_o_camera_snapshot, f_o_camera_track } from './o_camera.module.js';
 import { f_o_box, f_o_box_edit, f_o_box_handle, f_validate_sample } from './training_data.module.js';
-import { f_a_grid, f_a_plane, f_focus_sweep, f_o_video_rect } from './training_workflow.module.js';
+import { f_a_grid, f_a_plane, f_focus_sweep } from './training_workflow.module.js';
 import { f_move_training } from './training_motion.module.js';
 import { f_action, o_actions } from './o_actions.js';
 import { o_component__icon } from './o_component__icon.js';

@@ -82,8 +82,8 @@ import {
     f_a_grid,
     f_a_plane,
     f_focus_sweep,
-    f_o_video_rect,
 } from '../webserved_dir/training_workflow.module.js';
+import { f_o_video_rect } from '../webserved_dir/camera_frame.module.js';
 Deno.test('snake grid, unique endpoint-inclusive focus planes and contained video geometry', () => {
     assert.deepEqual(f_a_grid(3, 2), [
         { n_x: 0, n_y: 0 },
