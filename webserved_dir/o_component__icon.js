@@ -40,8 +40,6 @@ const o_path = {
     invert: 'M3 7h16l-4-4 M21 17H5l4 4 M12 4v16',
     flat: 'M12 3v2 M12 19v2 M3 12h2 M19 12h2 M5 5l2 2 M17 17l2 2 M5 19l2-2 M17 7l2-2 M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
     scale: 'M3 7h18v10H3z M7 7v5 M12 7v3 M17 7v5',
-    cell: 'M7 4c5-4 13 1 14 7s-8 13-14 9S0 7 7 4z M14 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
-    training: 'M12 3l9 5-9 5-9-5z M6 10v7l6 4 6-4v-7 M21 8v8',
     detection: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
     gamepad: 'M7 7h10c4 0 6 13 2 13l-4-4H9l-4 4C1 20 3 7 7 7z M6 11v4 M4 13h4 M16 11h1 M18 14h1 M12 7V3',
     macro: 'M6 3h12v18H6z M9 7h6 M9 11h6 M9 15h3',

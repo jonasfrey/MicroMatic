@@ -37,12 +37,10 @@ import { o_component__scale } from './o_component__scale.js';
 import { o_component__focus_step } from './o_component__focus_step.js';
 import { o_component__focus } from './o_component__focus.js';
 import { o_component__focus_stack } from './o_component__focus_stack.js';
-import { o_component__cellpose } from './o_component__cellpose.js';
 import { o_component__zoom } from './o_component__zoom.js';
 import { o_component__record } from './o_component__record.js';
 import { o_component__recording_library } from './o_component__recording_library.js';
 import { o_component__video } from './o_component__video.js';
-import { o_component__training } from './o_component__training.js';
 import { f_o_config__default, f_b_recording__server } from './o_recording.module.js';
 import { f_o_video_config__default } from './o_video.module.js';
 import { o_component__backlash } from './o_component__backlash.js';
@@ -153,16 +151,6 @@ let o_state = reactive({
         o_camera__flat: null,
     },
 
-    // cellpose segmentation mask drawn over the live image. the panel fills
-    // this in; the webcam component owns the full-page <img> that renders it,
-    // so the mask sits on the main window instead of in a second preview.
-    o_cellpose: {
-        s_path_mask: '',
-        n_pct__opacity: 70,
-        b_visible: true,
-        n_ts_ms__mask: 0,
-    },
-
     // digital zoom magnifier: a floating overlay window that shows a region of
     // the live image picked with Ctrl + drag (or the Select area button).  the
     // region is kept in camera pixels (n_..._roi) so it follows a window resize.
@@ -252,12 +240,9 @@ let o_state = reactive({
     // DB-linked maps for the current slide
     a_o_map__scanned: [],
 
-    b_training_busy: false,
-    b_training_capture_busy: false,
-
     // UI
     o_motion_detection: f_o_motion_config(),
-    o_panel_visibility: { motion_detection: false, setup: false, map: false, gamepad: false, slide_library: false, scan: false, camera_setting: false, led_setting: false, macro: false, auto_move: false, autostitch: false, calibration: false, focus: false, focus_step: false, focus_stack: false, scale: false, stats: false, cellpose: false, zoom: false, record: false, recording_library: false, video: false, training: false },
+    o_panel_visibility: { motion_detection: false, setup: false, map: false, gamepad: false, slide_library: false, scan: false, camera_setting: false, led_setting: false, macro: false, auto_move: false, autostitch: false, calibration: false, focus: false, focus_step: false, focus_stack: false, scale: false, stats: false, zoom: false, record: false, recording_library: false, video: false },
     o_key_held: {},
 
     // scan
@@ -496,7 +481,6 @@ let f_apply_setting_from_db = function(){
     if(o_vis.backlash) o_state.o_panel_visibility.setup = true;
     o_state.o_panel_visibility.scale = o_vis.scale || false;
     o_state.o_panel_visibility.stats = o_vis.stats || false;
-    o_state.o_panel_visibility.cellpose = o_vis.cellpose || false;
     o_state.o_panel_visibility.zoom = o_vis.zoom || false;
     o_state.o_panel_visibility.record = o_vis.record || false;
     o_state.o_panel_visibility.recording_library = o_vis.recording_library || false;
@@ -983,10 +967,7 @@ let f_connect_esp__auto = async function() {
 
 // ─── Send ───────────────────────────────────────────────────────────
 
-let f_send_esp = function(o_msg, s_owner) {
-    if (o_state.b_training_busy && s_owner !== 'training' && !['status', 'stop', 'stopAll'].includes(o_msg.command)) {
-        throw new Error('Training is using the stage. Stop training before starting another operation.');
-    }
+let f_send_esp = function(o_msg) {
     // record macro commands (skip status polls)
     if (o_state.b_recording__macro && o_msg.command !== 'status' && o_msg.command !== 'setBacklash') {
         let n_ts_ms_now = Date.now();
@@ -1015,7 +996,6 @@ let f_send_esp_run_continuous = function(n_motor, n_rpm, s_direction) {
 };
 
 let f_send_esp_move_step = function(n_motor, n_step, n_rpm) {
-    if(o_state.b_training_busy) return Promise.reject(new Error('Training is using the stage'));
     if(!Number.isInteger(n_motor) || n_motor < 0 || n_motor > 2) return Promise.reject(new Error('No motor assigned to this axis'));
     return new Promise(function(resolve) {
         if (!f_b_esp_connected()) {
@@ -1150,12 +1130,10 @@ o_app.component('o_component__scale', o_component__scale);
 o_app.component('o_component__focus_step', o_component__focus_step);
 o_app.component('o_component__focus', o_component__focus);
 o_app.component('o_component__focus_stack', o_component__focus_stack);
-o_app.component('o_component__cellpose', o_component__cellpose);
 o_app.component('o_component__zoom', o_component__zoom);
 o_app.component('o_component__record', o_component__record);
 o_app.component('o_component__recording_library', o_component__recording_library);
 o_app.component('o_component__video', o_component__video);
-o_app.component('o_component__training', o_component__training);
 o_app.component('o_component__backlash', o_component__backlash);
 o_app.component('o_component__slide_library', o_component__slide_library);
 o_app.component('o_component__motion_detection', o_component__motion_detection);

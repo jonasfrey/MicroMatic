@@ -180,13 +180,13 @@ let o_component__focus_stack = {
             return n_motor === null ? 'No focus motor — configure Z in Setup → motor cards.' : 'Motor ' + (n_motor + 1) + ' (Z axis, set in Setup)';
         },
         b_ready: function() {
-            if (f_n_motor__axis('z') === null || !o_state.b_connected__esp || !o_state.b_streaming__webcam || o_state.b_scanning || o_state.b_training_busy) return false;
+            if (f_n_motor__axis('z') === null || !o_state.b_connected__esp || !o_state.b_streaming__webcam || o_state.b_scanning) return false;
             return this.b_hardware_ready && !this.s_validation;
         },
         b_hardware_ready: function() {
             let motor = f_n_motor__axis('z');
             return motor !== null && o_state.b_connected__esp && o_state.b_streaming__webcam &&
-                !o_state.b_scanning && !o_state.b_training_busy && !o_state.a_o_motor[motor]?.b_running && !this.b_running;
+                !o_state.b_scanning && !o_state.a_o_motor[motor]?.b_running && !this.b_running;
         },
         s_focus_reference: function() {
             return String(f_n_motor__axis('z')) + ':' + o_state.b_connected__esp;

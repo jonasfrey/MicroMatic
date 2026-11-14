@@ -39,19 +39,7 @@ body {
   object-fit: contain; background: #000;
   z-index: 1;
 }
-/* cellpose segmentation mask, drawn straight onto the main window.  it has to
-   mirror #webcamVideo exactly (same box, same object-fit) or the masks would
-   not sit on the cells.  above the video and the filter canvas, below the
-   panels (z-index 100) and the capture flash.
-   pointer-events: none keeps mouse jog working through the mask. */
-#cellposeMask {
-  position: fixed; inset: 0;
-  width: 100%; height: 100%;
-  object-fit: contain;
-  z-index: 4;
-  pointer-events: none;
-}
-/* auto move snapshot overlay: mirrors #webcamVideo the same way, just below the mask */
+/* auto move snapshot overlay: mirrors #webcamVideo the same way */
 .auto-move-overlay {
   position: fixed; inset: 0;
   width: 100%; height: 100%;
@@ -82,7 +70,7 @@ body {
 /* ─── Digital zoom: region of interest + pick layer ─── */
 /* the picked region is projected straight onto the live image.  pointer-events
    none keeps mouse jog (z 10) and every other overlay working underneath.
-   above the cellpose mask (z 4), below the panels (z 50). */
+   below the panels (z 50). */
 .zoom-roi-canvas {
   position: fixed; inset: 0;
   width: 100%; height: 100%;
@@ -1710,86 +1698,6 @@ input[type="range"]::-moz-range-thumb {
 .btn-autostitch-stop:hover { background: var(--danger); color: #000; }
 .btn-autostitch-reset:hover { border-color: var(--text); }
 
-/* ─── Cell pose panel ─── */
-.panel-cellpose {
-  top: var(--topbar-h); right: 16px; width: 340px;
-  max-height: calc(100vh - var(--topbar-h) - 16px); overflow-y: auto;
-  --card-accent: var(--accent-2);
-}
-
-.cellpose-field { margin-bottom: 10px; }
-.cellpose-field label {
-  display: block;
-  font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
-  font-weight: 700; color: var(--dim); text-transform: uppercase;
-  letter-spacing: 1px; margin-bottom: 4px;
-}
-.cellpose-field input,
-.cellpose-field select {
-  width: 100%; padding: 6px 10px;
-  background: rgba(10,10,12,0.6); border: 1px solid var(--border);
-  border-radius: 6px; color: var(--text);
-  font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
-  outline: none;
-}
-.cellpose-field input:focus,
-.cellpose-field select:focus { border-color: var(--accent-2); }
-.cellpose-field input[type="range"] { padding: 0; border: none; background: transparent; }
-
-.cellpose-hint {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.66rem;
-  color: var(--dim); line-height: 1.5; margin-bottom: 10px;
-}
-.cellpose-mono { color: var(--accent-2); }
-
-.cellpose-info { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
-.cellpose-count {
-  font-family: 'JetBrains Mono', monospace; font-size: 1.4rem;
-  font-weight: 700; color: var(--text);
-}
-.cellpose-label {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--dim);
-}
-
-.cellpose-status {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
-  color: var(--accent-0); text-align: center; margin: 8px 0;
-  overflow-wrap: anywhere;
-}
-
-/* "the stage is moving" notice: it explains why capture is refused / the loop
-   is paused, so it reads as a state, not as an error */
-.cellpose-lock {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
-  color: var(--yellow); text-align: center; line-height: 1.5;
-  margin-bottom: 10px; padding: 6px 8px;
-  border: 1px solid var(--yellow); border-radius: 6px;
-  background: color-mix(in srgb, var(--yellow) 8%, transparent);
-}
-
-.btn-cellpose-start,
-.btn-cellpose-stop,
-.btn-cellpose-remove {
-  width: 100%; padding: 10px 16px; border-radius: 8px;
-  border: 1px solid var(--border); background: transparent; color: var(--text);
-  font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 700;
-  cursor: pointer; transition: all 0.2s; text-transform: uppercase; letter-spacing: 1px;
-}
-.btn-cellpose-start { background: var(--accent-2); color: #000; border-color: var(--accent-2); }
-.btn-cellpose-start:hover { filter: brightness(1.1); }
-.btn-cellpose-start:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
-.btn-cellpose-stop { border-color: var(--danger); color: var(--danger); }
-.btn-cellpose-stop:hover { background: var(--danger); color: #000; }
-/* "Remove mask" is a secondary action: quieter than start/stop, with a gap so
-   it does not read as part of the stop button */
-.btn-cellpose-remove {
-  margin-top: 8px; padding: 7px 12px; font-size: 0.7rem;
-  color: var(--dim); border-color: var(--border);
-}
-.btn-cellpose-remove:hover { color: var(--text); border-color: var(--text); }
-
-.cellpose-log-wrap { margin-top: 10px; }
-
 /* ─── Macro panel ─── */
 .panel-macro {
   bottom: 16px; left: 50%; transform: translateX(-50%);
@@ -2275,108 +2183,6 @@ input[type="range"]::-moz-range-thumb {
 .filter-exact-value { width: 6.5em; padding: 4px; color: inherit; background: var(--bg, #181b22); border: 1px solid var(--dim, #666); border-radius: 4px; }
 .control-highlight { outline: 3px solid #8ce0c6 !important; outline-offset: 3px; }
 .action-search-hint { color: var(--text-muted, #a8b3c2); margin: 4px; font-size: 12px; }
-/* Training captures use a fixed, full-frame coordinate system. */
-.panel-training { top: var(--topbar-h); right: 16px; width: min(760px, calc(100vw - 32px)); }
-.panel-training .panel-body { max-height: calc(100dvh - var(--topbar-h) - 70px); overflow-y: auto; }
-.panel-training fieldset { border: 0; padding: 0; min-width: 0; }
-.panel-training button, .panel-training select, .panel-training input { margin: 3px; }
-.panel-training p { margin: 8px 0; }
-.training-label { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
-.training-label input:not([type]) { min-width: 100px; flex: 1; }
-.training-label input[type=color] { width: 40px; }
-.training-image { display: block; width: 100%; touch-action: none; cursor: crosshair; user-select: none; }
-.training-image > * { pointer-events: none; }
-.training-saved { border-top: 1px solid var(--border); padding: 10px 0; }
-.training-filmstrip { display: flex; gap: 10px; overflow-x: auto; align-items: start; }
-.training-filmstrip > svg { width: 200px; height: 130px; flex: 0 0 200px; }
-.training-filmstrip figure { margin: 0; flex: 0 0 100px; }
-.training-filmstrip figure svg { width: 100px; height: 100px; }
-
-/* Training controls sit beside the live image; no frozen secondary preview. */
-body.training-mode { --training-panel: 392px; }
-.training-mode #webcamVideo,
-.training-mode #webcamFrame,
-.training-mode .filter-canvas,
-.training-mode .auto-move-overlay,
-.training-mode #cellposeMask {
-  inset: var(--topbar-h) auto auto 0;
-  width: calc(100vw - var(--training-panel));
-  height: calc(100dvh - var(--topbar-h));
-}
-.panel-training { width: 360px; }
-.panel-training .panel-body { padding: 12px; }
-.training-live-overlay { position: fixed; z-index: 25; touch-action: none; cursor: crosshair; }
-.training-live-overlay > * { pointer-events: none; }
-.training-label input:not([type]) { width: 100px; }
-.training-label .selected { outline: 2px solid var(--accent-1); }
-.training-axis, .training-axis-head { display: grid; grid-template-columns: 24px 64px 80px 1fr; gap: 5px; align-items: center; margin-top: 8px; }
-.training-axis-head { font-size: 11px; color: var(--dim); }
-.training-axis input { width: 100%; min-width: 0; }
-.training-axis button { width: 28px; }
-.training-navigation { display: flex; gap: 16px; align-items: center; margin: 12px 0 6px; }
-.training-grid { display: grid; gap: 3px; flex: 1; max-height: 140px; overflow: auto; }
-.training-grid span { position: relative; min-width: 18px; min-height: 18px; text-align: center; border: 1px solid var(--dim); font-size: 10px; }
-.training-grid .captured { background: #16774d; }
-.training-grid .current { outline: 2px solid var(--accent-0); outline-offset: -2px; }
-.training-grid .visited::after { content: '·'; position: absolute; right: 1px; bottom: -3px; font-weight: bold; }
-.training-reset { display: block; }
-.training-focus { display: flex; gap: 4px; align-items: center; margin: 12px 0 6px; }
-.training-focus label { width: 66px; font-size: 12px; }
-.training-focus input { width: 60px; }
-.training-focus button { flex: 1; }
-.training-capture { width: 100%; padding: 12px; margin-top: 12px !important; font-size: 18px; }
-.training-stop { width: 100%; padding: 10px; color: var(--danger); }
-.training-filmstrip { overflow: hidden; gap: 8px; }
-.training-filmstrip > svg { width: 96px; height: 80px; flex: 0 0 96px; }
-.training-crop-row { display: flex; gap: 8px; min-width: 0; overflow-x: auto; flex: 1; }
-.training-crop-row figure { flex: 0 0 76px; }
-.training-crop-row figure svg { width: 76px; height: 76px; }
-@media (max-width: 800px) {
-  .training-mode #webcamVideo, .training-mode #webcamFrame, .training-mode .filter-canvas, .training-mode .auto-move-overlay, .training-mode #cellposeMask {
-    width: 100vw; height: calc((100dvh - var(--topbar-h)) * .45);
-  }
-  .training-mode .panel-training { top: calc(var(--topbar-h) + (100dvh - var(--topbar-h)) * .45); bottom: 8px; }
-  .training-mode .panel-training .panel-body { max-height: calc((100dvh - var(--topbar-h)) * .55 - 60px); }
-}
-.panel-training input, .panel-training select, .panel-training button:not(.panel-close) {
-  font: inherit; font-size: 12px; color: var(--text); background: var(--bg);
-  border: 1px solid var(--border); border-radius: 4px; padding: 4px 6px;
-}
-.panel-training input[type=color] { padding: 2px; height: 26px; }
-.panel-training button:not(:disabled) { cursor: pointer; }
-.panel-training button:disabled { opacity: .45; }
-.panel-training button:hover:not(:disabled) { border-color: var(--accent-1); }
-.panel-training a { color: var(--accent-1); font-size: 12px; }
-.panel-training button.training-capture { font-size: 18px; padding: 12px; border-color: var(--accent-1); }
-.panel-training button.training-stop { color: var(--danger); border-color: var(--danger); }
-.panel-training small { font-size: 11px; }
-.panel-training h3 { font-size: 14px; }
-.panel-training .training-axis input { margin: 0; }
-.panel-training .training-axis button { margin: 0 2px; padding: 4px 2px; }
-.training-live-overlay.training-cursor-resize { cursor: nesw-resize; }
-.training-live-overlay.training-cursor-grab { cursor: grab; }
-.training-live-overlay.training-cursor-grabbing { cursor: grabbing; }
-/* Contrasting dashed strokes stay legible on both bright and dark specimens. */
-.training-pointer-guide { pointer-events: none; }
-.training-pointer-guide path { fill: none; stroke-dasharray: 6 4; }
-.training-guide-outline { stroke: #000; stroke-width: 3; opacity: .6; }
-.training-guide-line { stroke: #fff; stroke-width: 1; opacity: .85; }
-.training-yolo { border-block: 1px solid var(--border); padding: 12px 0; margin: 12px 0; }
-.training-yolo input { width: 65px; }
-.training-yolo p { font-size: 12px; }
-.training-yolo pre { max-height: 140px; overflow: auto; white-space: pre-wrap; font-size: 10px; }
-.training-yolo progress { width: 100%; }
-.training-dataset { padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
-.training-dataset > label, .training-yolo > label { display: block; font-size: 12px; margin: 6px 0; }
-.training-dataset select, .training-yolo select { width: 100%; min-width: 0; }
-.training-yolo input[aria-label="New YOLO model name"] { width: 100%; }
-.training-yolo input[type=checkbox] { width: auto; }
-
-.training-live-overlay.training-cursor-idle { cursor: default; }
-.zoom-stage .training-live-overlay.training-cursor-idle { cursor: grab; }
-
-.training-live-overlay.training-cursor-crop { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M6 1v17h17M1 6h17v17' fill='none' stroke='black' stroke-width='4'/%3E%3Cpath d='M6 1v17h17M1 6h17v17' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E") 6 6, crosshair; }
-
 /* Moving regions are aligned to the contained camera image and never capture input. */
 .motion-detection-overlay { position: fixed; z-index: 6; pointer-events: none; }
 .panel-motion-detection {
@@ -2404,14 +2210,6 @@ body.training-mode { --training-panel: 392px; }
 .hardware-state--unknown { color: var(--dim); }
 .hardware-state--ready { color: var(--green, #72cb98); }
 .hardware-state--warning { color: var(--yellow); }
-
-.training-live-overlay.training-cursor-draw { cursor: crosshair; }
-.training-sam-control { display: grid; gap: 8px; margin-block: 12px; padding-block: 10px; border-block: 1px solid var(--border); }
-.training-sam-control label { font-size: 12px; }
-.training-sam-control .training-label { flex-wrap: wrap; }
-.training-sam-help { position: fixed; z-index: 1000; pointer-events: none; width: 230px; box-sizing: border-box;
-  padding: 8px 10px; border: 1px solid #7c8b85; border-radius: 6px; background: #101b19ee;
-  color: #fff; font: 12px/1.5 system-ui, sans-serif; box-shadow: 0 2px 10px #0005; }
 
 /* ═══ Cockpit layout system ═══════════════════════════════════════════════
    Every window shows its functions without scrolling: dense field grids,
@@ -2460,7 +2258,7 @@ body.training-mode { --training-panel: 392px; }
 .cockpit-icon-button:disabled { opacity: 0.4; cursor: not-allowed; }
 .cockpit-icon-button.active { color: var(--accent-1); border-color: var(--accent-1); }
 .cockpit-icon-button.danger:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); }
-.overlay-panel :is(.btn-scan-start, .btn-scan-stop, .btn-cellpose-start, .btn-cellpose-stop, .btn-autostitch-start, .btn-autostitch-stop, .btn-autostitch-reset) {
+.overlay-panel :is(.btn-scan-start, .btn-scan-stop, .btn-autostitch-start, .btn-autostitch-stop, .btn-autostitch-reset) {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   margin-top: 0; padding: 7px 12px; min-height: 32px; border-radius: 6px; font-size: 0.72rem;
 }
@@ -2503,12 +2301,12 @@ body.training-mode { --training-panel: 392px; }
 }
 .ui-info::before { content: 'i'; }
 .ui-info:hover, .ui-info:focus-visible { color: var(--text); outline: none; }
-.overlay-panel :is(.cockpit-field, .scan-field, .focus-field, .cellpose-field, .autostitch-field)[data-tooltip] > label:first-child::after {
+.overlay-panel :is(.cockpit-field, .scan-field, .focus-field, .autostitch-field)[data-tooltip] > label:first-child::after {
   content: 'i'; display: inline-block; width: 10px; height: 10px; margin-left: 4px; border: 1px solid currentColor; border-radius: 50%;
   font: 700 7px/9px 'JetBrains Mono', monospace; text-align: center; text-transform: none; letter-spacing: 0; opacity: 0.75; vertical-align: 1px;
 }
 .overlay-panel [data-tooltip]:hover > label:first-child { color: var(--text); }
-:is(.scan-hint, .focus-note, .filter-note, .live-note, .cellpose-hint, .setup-hint, .micro-hint) { margin: 4px 0 0; font-size: 0.62rem; line-height: 1.35; }
+:is(.scan-hint, .focus-note, .filter-note, .live-note, .setup-hint, .micro-hint) { margin: 4px 0 0; font-size: 0.62rem; line-height: 1.35; }
 
 /* pictogram tabs */
 .cockpit-tab-strip { display: flex; gap: 2px; padding: 4px 8px 0; border-bottom: 1px solid var(--border); flex: 0 0 auto; }
@@ -2567,42 +2365,6 @@ body.training-mode { --training-panel: 392px; }
 .panel-scan .scan-progress-text { margin-bottom: 0; font-size: 0.66rem; }
 .panel-scan .scan-summary { margin-bottom: 0; }
 .panel-scan .scan-summary-item { padding: 5px 0; }
-
-/* Training: Data / Stage / Draw / Model / Saved panes, Capture fixed in the footer */
-.panel-training .panel-body { max-height: none; padding: 10px 12px 12px; }
-.panel-training :is(button, input, select) { margin: 0; }
-.panel-training p { margin: 4px 0; font-size: 12px; }
-.panel-training button.cockpit-tab:not(.panel-close) {
-  padding: 5px 2px 6px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--dim);
-  font-family: 'JetBrains Mono', monospace; font-size: 0.56rem; font-weight: 700; gap: 4px;
-}
-.panel-training button.cockpit-tab:not(.panel-close):hover:not(:disabled) { color: var(--text); border-bottom-color: transparent; }
-.panel-training button.cockpit-tab.active:not(.panel-close) { color: var(--text); border-bottom-color: var(--accent-1); }
-.panel-training fieldset { display: block; }
-.panel-training .training-dataset { padding-bottom: 8px; margin-bottom: 8px; }
-.panel-training .training-dataset > label { margin: 0 0 6px; }
-.panel-training .training-dataset select { margin-top: 3px; }
-.panel-training .training-label { gap: 5px; margin-top: 5px; }
-.panel-training .training-label:first-child { margin-top: 0; }
-.training-label-list { max-height: 196px; margin-bottom: 6px; }
-.training-box-list { max-height: 150px; }
-.training-saved-list { max-height: min(58vh, 520px); margin-top: 6px; }
-.panel-training .training-saved { padding: 8px 0; }
-.panel-training .training-axis, .panel-training .training-axis-head { margin-top: 5px; }
-.panel-training .training-axis-head { margin-top: 0; }
-.panel-training .training-navigation { gap: 10px; margin: 8px 0 4px; align-items: flex-start; }
-.training-navigation-action { display: grid; gap: 5px; flex: 0 0 auto; }
-.panel-training .training-focus { margin: 0; }
-.panel-training .training-focus button { padding: 2px 6px; line-height: 1.2; }
-.panel-training .training-sam-control { margin-block: 0 8px; padding-block: 0 8px; border-top: 0; gap: 6px; }
-.panel-training .training-settings { font-size: 12px; white-space: normal; }
-.panel-training .training-yolo { border: 0; padding: 0; margin: 0; }
-.panel-training .training-yolo > label { margin: 0 0 6px; }
-.panel-training .training-yolo h3 { margin-bottom: 6px; }
-.panel-training .training-yolo pre { max-height: 110px; }
-.panel-training .training-footer { gap: 4px; }
-.panel-training button.training-capture { margin-top: 0 !important; padding: 8px; font-size: 15px; }
-.panel-training .training-footer p { margin: 0; }
 
 /* Image filter: one line per slider, exposure warnings in one block */
 .panel-camera-setting .filter-power { min-height: 24px; padding: 2px 9px; }
@@ -2763,15 +2525,6 @@ body.training-mode { --training-panel: 392px; }
 .panel-motion-detection .motion-detection-config label { gap: 2px; font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; color: var(--dim); white-space: nowrap; }
 .panel-motion-detection .motion-detection-status { margin: 8px 0 0; font: 0.64rem 'JetBrains Mono', monospace; }
 
-/* Cell pose: fields side by side */
-.panel-cellpose { width: 360px; }
-.panel-cellpose .panel-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 8px; align-items: end; }
-.panel-cellpose .panel-body > * { grid-column: 1 / -1; margin: 0; }
-.panel-cellpose .panel-body > .cellpose-field { grid-column: auto; }
-.panel-cellpose .cellpose-field label { display: block; margin-bottom: 2px; font-size: 0.56rem; letter-spacing: 0.8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.panel-cellpose .cellpose-field :is(input[type="number"], select) { width: 100%; }
-.panel-cellpose .live-log { max-height: 110px; overflow-y: auto; }
-
 /* Map, Slide library */
 .panel-map .live-row { gap: 6px; margin-bottom: 6px; }
 .panel-map .live-row .toolbar-toggle { padding: 3px 9px; min-height: var(--cockpit-control); }
@@ -2837,10 +2590,6 @@ body.training-mode { --training-panel: 392px; }
 .panel-scan .btn-scan-start { letter-spacing: 0.5px; padding-inline: 6px; }
 .record-output { grid-template-columns: 1.5fr 1fr 0.8fr 1fr; }
 .video-mode .btn-small { padding: 3px 4px; font-size: 0.6rem; }
-.panel-training { font-size: 12px; }
-.panel-training .cockpit-tab-strip { padding-inline: 6px; }
-.panel-training button.cockpit-tab:not(.panel-close) { flex: 1 1 auto; letter-spacing: 0.2px; }
-.panel-training h3 { font-size: 13px; }
 .panel-scale .panel-header h2, .panel-calibration .panel-header h2, .panel-motion-detection .panel-header h2, .panel-gamepad .panel-header h2, .panel-focus_step .panel-header h2 { overflow: visible; }
 
 :is(.panel-focus, .panel-focus_step, .panel-focus_stack) .focus-field label { letter-spacing: 0.2px; }

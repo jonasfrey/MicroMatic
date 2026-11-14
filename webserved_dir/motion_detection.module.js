@@ -127,7 +127,7 @@ let f_o_motion_detector = function() {
     return { f_detect, f_reset };
 };
 
-// Match object-fit: contain, including the side-by-side training layout.
+// Match object-fit: contain.
 let f_o_motion_view = function(o_rect, n_scl_x, n_scl_y) {
     let n_scale = Math.min(o_rect.width / n_scl_x, o_rect.height / n_scl_y);
     return {

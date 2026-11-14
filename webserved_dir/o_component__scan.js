@@ -509,7 +509,6 @@ let o_component__scan = {
         s_stage_block_reason() {
             if (!o_state.b_connected__esp) return 'Connect the motor controller in Setup.';
             if (o_state.b_flashing) return 'Wait for firmware flashing to finish.';
-            if (o_state.b_training_busy) return 'Wait for training to release the stage.';
             if (this.b_testing || o_state.b_scanning) return 'Wait for the current movement or calibration to finish.';
             if (['x', 'y'].some(axis => f_n_motor__axis(axis) === null)) return 'Assign X and Y motors in Setup.';
             if (o_state.a_o_motor.some(motor => motor.b_running)) return 'Stop manual movement before starting the scan.';

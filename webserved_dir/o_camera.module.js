@@ -171,7 +171,7 @@ let f_apply_camera_resolution = async function(n_scl_x, n_scl_y, n_frame_rate = 
     let o_camera = o_state.o_camera;
     if (!o_track || o_camera.b_applying_resolution) return false;
     o_camera.s_error__resolution = '';
-    if (o_state.b_scanning || o_state.b_training_busy || o_state.b_training_capture_busy || o_state.o_record?.b_running ||
+    if (o_state.b_scanning || o_state.o_record?.b_running ||
         o_state.o_video?.b_recording || o_state.o_video?.b_preroll || o_state.o_video?.b_burst) {
         o_camera.s_error__resolution = 'Stop scanning or recording before changing resolution.';
         return false;

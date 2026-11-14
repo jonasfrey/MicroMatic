@@ -3,6 +3,13 @@
 What changed in the app, newest first. Before 2026-10-25 the entries are taken
 from commit messages; commits titled only "updates" are not listed (see `git log`).
 
+## 2026-11-14
+
+**AI tools moved to branch `_experimental_ki_tools`**
+- Removed from main: Cell pose window (Cellpose), Train model window (annotation, training data capture, SAM masks, YOLO training/inference), their server routes, workers, tests and feature notes.
+- `deno task install` no longer sets up `venv_cellpose`; `--skip-cellpose`, `--cpu` and `deno task install-yolo` are gone. Existing `venv_cellpose/`, `venv_yolo/`, `training_data/` folders stay on disk and stay git-ignored.
+- AI-based stitching (LightGlue, LoFTR) is unchanged.
+
 ## 2026-11-10
 
 **Auto move**

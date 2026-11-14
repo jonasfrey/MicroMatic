@@ -29,7 +29,6 @@ installed on first run (skipped afterwards, so `deno task start` stays fast):
 - `arduino-cli` into `~/.local/bin` + the `esp32:esp32` board package + the `ArduinoJson` library — these compile the ESP32 firmware on the server
 - `./venv` with `numpy` + `opencv-python` — used by `stitch.py` (the tile scan mosaic)
 - `torch` (cpu build) + `lightglue` + `kornia` — used by `autostitch.py` and by `stitch.py --matcher loftr`
-- `./venv_cellpose` with `torch` + `cellpose` — used by `cellpose_worker.py` for the `Cell pose` panel
 - linux only: `v4l2-ctl` (system package `v4l-utils`, installed with `sudo`, which may ask for your password) — gives the Camera window the real sensor sizes of the camera and the controls the browser cannot reach (ISO). on other systems the Camera window works without them
 
 the installer also runs `stitch.py --help` inside the venv, so a broken numpy/opencv
@@ -47,10 +46,6 @@ install is reported before a scan is started rather than after it.
 
 `deno task install --skip-stitch-ai` leaves out torch/lightglue/kornia if you do not need
 autostitch or the LoFTR rescue matcher. `stitch.py` itself only needs numpy + opencv.
-
-`deno task install --skip-cellpose` leaves out the separate `./venv_cellpose` if you do
-not need the `Cell pose` panel. `--cpu` installs the small CPU-only torch build instead
-of the ~3 GB CUDA one.
 
 ## hardware setup and browser flashing
 
@@ -321,98 +316,6 @@ tab or a sleeping host are recorded as events instead of silently losing time.
 the `Record` panel also probes the server for `/dev/video*`, the prerequisite for
 a future unattended server-side capture mode.
 
-## cell segmentation with cellpose (`Cell pose` panel)
-the `Cell pose` button opens a panel that segments the live camera image with
-[Cellpose](https://github.com/MouseLand/cellpose) and draws the found cells
-**straight onto the live image** as a coloured mask — the mask is an overlay on
-the main window, not a second preview inside the panel. two modes:
-
-| mode | what it does |
-| --- | --- |
-| `Single image` | grab one frame, segment it, stop. the safe default on a CPU |
-| `Loop` | capture → segment → pause → repeat until you press stop |
-
-the mask stays on the image after a single run, so you can compare it with the
-next one; **Remove mask** takes it off (during a loop it also stops the loop).
-the opacity slider blends it over the video, and the overlay ignores mouse
-events, so mouse jog keeps working underneath.
-
-**the stage has to stand still.** `Capture & segment` is disabled while any motor
-is turning, and the mask is taken off the image the moment a motor starts again —
-a frame grabbed mid-move is smeared, and a mask computed from it points at cells
-that are no longer under the crosshair. a running `Loop` does not fail on motion:
-it pauses and picks up again once the stage is still. this covers every source of
-motion (jog keys, mouse jog, gamepad, macro, autofocus), because it watches the
-motor state the firmware reports rather than the input device.
-
-the mask is cleared whenever a motor starts — even while a `Loop` is paused
-between frames — so you see the mask go the moment you touch the jog keys, and
-the next paused frame draws a fresh one. clearing it during a seek inside one
-inference cost nothing: the mask is already being redrawn.
-
-the model runs on the **server**, not in the browser (`cellpose_worker.py`, driven
-by `cellpose_functions.module.js`). the worker is started once and kept alive, so
-the weights are loaded a single time instead of once per frame. the browser only
-grabs frames and uploads them (`POST /api/cellpose/frame`), which also means the
-flat-field correction is applied to what the model sees.
-
-`Inference size` is the long side the frame is scaled to before the network sees
-it (the mask is scaled back up to the full frame afterwards). **this is the
-speed/accuracy dial.** `cpsam` (Cellpose-SAM, the default) and `cyto3` (the
-smaller Cellpose 3 cytoplasm model) are both available. measured here on a
-32-core CPU with no GPU, one 1920×1080 blood-smear frame, through the full worker
-path:
-
-| model | inference size | time per frame | cells found |
-| --- | --- | --- | --- |
-| `cyto3` | 384 px | ~51 s | ~950 |
-| `cpsam` | 384 px | ~50 s | ~910 |
-| `cyto3` | 512 px | ~150 s | ~1110 |
-| `cpsam` | 512 px | ~155 s | ~1100 |
-| `cpsam` | 1024 px | ~380 s | ~1120 |
-
-two things worth knowing before you pick a model or a size:
-
-- **there is no fast setting on a CPU.** even a 144 px inference costs ~50 s,
-  because the cost is dominated by the network's fixed work, not by the pixel
-  count; below ~300 px the cells are simply too small to resolve and the mask
-  comes back empty. budget roughly a minute per frame at 384 px, several minutes
-  at 512 px. **these numbers are the no-GPU case** — see below.
-- **`cyto3` is not the shortcut it sounds like** *in the Cellpose 4 venv this
-  project installs*: it is segmented through the same pipeline and takes about
-  as long as `cpsam` (it does find slightly more of the tightly packed cells at
-  512 px). pick it for the smaller 25 MB weight download and its cytoplasm
-  training, not for speed.
-
-### GPU
-
-`deno task install` detects an NVIDIA card and installs a **CUDA build of
-torch**; on a GPU a frame is 1–2 s instead of 50–150 s and the `Loop` mode becomes
-genuinely live. the panel shows the device it is running on next to the frame
-stats (`CUDA` / `CPU`), and the worker logs it when the model loads.
-
-if the panel says `CPU` on a machine that has a card, the usual cause is that the
-process cannot open `/dev/nvidia*` — `nvidia-smi` and `torch.cuda.is_available()`
-have to be run **by the same process that runs the server**. check inside that
-environment with:
-
-```sh
-venv_cellpose/bin/python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else '')"
-```
-
-a CUDA build degrades to the CPU on its own, so an unreadable device is not an
-error — it is just slow. use `--cpu` to install the smaller CPU-only build when
-you know the machine will never have a card.
-
-the weights are downloaded on first use into `weights/cellpose/` — ~1.2 GB for
-`cpsam`, ~25 MB for `cyto3` — and every frame with its `.json` numbers (cell
-count, areas, inference seconds) is written into
-`scans/cellpose_<date>_<time>/`.
-
-**licence note:** the Cellpose *code* is BSD-3-Clause, but every pretrained model
-is trained on **CC-BY-NC** data and is therefore **non-commercial use only** (see
-[`THIRD-PARTY-NOTICES.md`](./THIRD-PARTY-NOTICES.md)).
-
 ## live "grow" stitching — not in this release
 earlier builds could grow a mosaic in real time while you drive the stage by
 hand. that used the `image_stitching2` python stitcher (`IncrementalStitcher`,
@@ -515,27 +418,8 @@ the threshold (default 5). Thresholds use the 0–255 camera pixel scale. Marker
 use the full-resolution camera texture and work with Processing off. Settings
 are saved with the image filter. Reset restores the defaults.
 
-Raw captures, scan tiles, and training images retain their camera pixels.
+Raw captures and scan tiles retain their camera pixels.
 Recordings using the processed-view source include the visible markers.
-
-### Automatic SAM annotations
-
-In **Training → Annotation settings**, enable **Automatically segment boxes with
-SAM**. This optional setting is remembered in the browser and starts disabled.
-Drawing, resizing, or moving a box runs box-prompted Segment Anything (SAM-B)
-on a raw camera snapshot and displays the selected pixels in the label color.
-Removed boxes and results from previous regions or datasets are ignored.
-
-SAM shares the optional AI environment installed with `deno task install-yolo`.
-Its first inference downloads `weights/sam/sam_b.pt` (about 358 MiB). The server
-reuses the loaded model, uses CUDA when available, and releases it after five
-minutes idle. CPU inference can take several seconds per frame.
-
-Capture segments each focus plane's actual saved image, including its crop.
-Lossless binary PNG masks and normalized contour outlines are retained in each
-box's `o_segmentation` metadata and included in dataset exports. YOLO detection
-labels still use bounding boxes. A SAM capture failure reports an error instead
-of saving that plane with missing masks; already saved planes remain available.
 
 ### Actions and input bindings
 

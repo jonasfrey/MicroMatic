@@ -165,8 +165,6 @@ let o_component__toolbar = {
                     { s_panel: 'recording_library', s_icon: 'folder', s_label: 'Recordings', s_title: 'Browse, play and export recorded sessions' },
                 ] },
                 { s_label: 'Analysis', a_o_tool: [
-                    { s_panel: 'cellpose', s_icon: 'cell', s_label: 'Cell pose', s_title: 'Segment cells in the camera image' },
-                    { s_panel: 'training', s_icon: 'training', s_label: 'Train model', s_title: 'Annotate images and train a detection model' },
                     { s_panel: 'motion_detection', s_icon: 'detection', s_label: 'Motion detection', s_title: 'Detect changes in the camera image' },
                 ] },
                 { s_label: 'Movement', a_o_tool: [

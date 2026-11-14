@@ -18,15 +18,6 @@ let o_component__webcam = {
             <span>No camera active</span>
             <span style="font-size:0.75rem;">select a camera in the toolbar above</span>
         </div>
-        <!-- cellpose segmentation mask: the same full-page box as the video and
-             the same object-fit, so the found cells land exactly on the image -->
-        <img
-            id="cellposeMask"
-            v-if="o_state.o_cellpose.b_visible && o_state.o_cellpose.s_path_mask"
-            :src="'/api/file?path=' + encodeURIComponent(o_state.o_cellpose.s_path_mask) + '&t=' + o_state.o_cellpose.n_ts_ms__mask"
-            :style="{ opacity: o_state.o_cellpose.n_pct__opacity / 100 }"
-            alt=""
-        />
         <div class="capture-flash" :class="{ flash: b_flash }"></div>
     `,
     data: function() {
@@ -69,7 +60,6 @@ let o_component__webcam = {
             let s_geometry = JSON.stringify([o_state.s_id__webcam_device, f_o_camera_geometry(el_video)]);
             if (this._s_geometry && this._s_geometry !== s_geometry) {
                 if (o_state.o_zoom) Object.assign(o_state.o_zoom, { n_scl_x__roi: 0, n_scl_y__roi: 0, b_selecting: false });
-                if (o_state.o_cellpose) o_state.o_cellpose.s_path_mask = '';
             }
             this._s_geometry = s_geometry;
             if (this.b_streaming && this.b_cropped && el_video.readyState >= 2) {

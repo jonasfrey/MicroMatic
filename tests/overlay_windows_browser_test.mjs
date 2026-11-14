@@ -11,7 +11,7 @@ const server = createServer(async (req, res) => {
         res.setHeader('Content-Type', 'text/html');
         res.end(`<link rel="stylesheet" href="/index.css"><style>.panel-body {height:120px}</style>
             <div class="overlay-panel panel-gamepad visible"><div class="panel-header"><h2>Gamepad</h2><button class="panel-close" onclick="window.clicked=true">×</button></div><div class="panel-body"><input></div></div>
-            <div class="overlay-panel panel-training visible"><div class="panel-header"><h2>Training</h2><button class="panel-close">×</button></div><div class="panel-body"></div></div>
+            <div class="overlay-panel panel-motion-detection visible"><div class="panel-header"><h2>Motion detection</h2><button class="panel-close">×</button></div><div class="panel-body"></div></div>
             <script type="module">import {f_install_overlay_windows} from '/overlay_windows.module.js'; window.cleanup = f_install_overlay_windows();</script>`);
         return;
     }
@@ -77,7 +77,7 @@ try {
         await mouse('mouseReleased', x + dx, y + dy, button);
     };
     // Hide the right-anchored panel until tested; it overlaps the centered one.
-    await evaluate("document.querySelector('.panel-training').classList.remove('visible')");
+    await evaluate("document.querySelector('.panel-motion-detection').classList.remove('visible')");
     const before = await rect();
     await drag(before.x + 40, before.y + 20, 120, 90);
     let after = await rect();
@@ -112,16 +112,16 @@ try {
     assert.equal(await evaluate("document.querySelector('[data-panel-dragging]') === null"), true);
     assert.ok((await rect()).x < after.x);
     await viewport(1600, 1000);
-    await evaluate("document.querySelector('.panel-gamepad').classList.remove('visible'); document.querySelector('.panel-training').classList.add('visible')");
-    const right = await rect('.panel-training');
+    await evaluate("document.querySelector('.panel-gamepad').classList.remove('visible'); document.querySelector('.panel-motion-detection').classList.add('visible')");
+    const right = await rect('.panel-motion-detection');
     await drag(right.x + 40, right.y + 20, -200, 70);
-    const moved = await rect('.panel-training');
+    const moved = await rect('.panel-motion-detection');
     assert.equal(moved.x, right.x - 200);
     assert.equal(moved.y, right.y + 70);
     assert.equal(moved.width, right.width);
     // Snap adjacent windows with an 8px gap, and snap near viewport edges.
     await evaluate(`
-        document.querySelector('.panel-training').classList.remove('visible');
+        document.querySelector('.panel-motion-detection').classList.remove('visible');
         for (const [id, left] of [['snap-a', 40], ['snap-b', 600]]) {
             const panel = document.createElement('div');
             panel.className = 'overlay-panel visible'; panel.id = id;
@@ -134,10 +134,10 @@ try {
     assert.equal((await rect('#snap-a')).x, 352);
     await drag(392, 120, -346, 0);
     assert.equal((await rect('#snap-a')).x, 0);
-    await evaluate("document.querySelector('#snap-a').remove(); document.querySelector('#snap-b').remove(); document.querySelector('.panel-training').classList.add('visible')");
+    await evaluate("document.querySelector('#snap-a').remove(); document.querySelector('#snap-b').remove(); document.querySelector('.panel-motion-detection').classList.add('visible')");
     await evaluate('cleanup()');
     await drag(moved.x + 40, moved.y + 20, 30, 30);
-    assert.deepEqual(await rect('.panel-training'), moved);
+    assert.deepEqual(await rect('.panel-motion-detection'), moved);
     console.log('Passed: centered/right-anchored panels, mouse/touch, controls, responsive bounds, reopen, snapping, cancellation and cleanup.');
 } finally {
     socket?.close();

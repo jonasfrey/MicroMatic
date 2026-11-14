@@ -1,7 +1,4 @@
 import { f_o_scan_jobs } from './scan_jobs.module.js';
-import { f_o_yolo_response } from './yolo_functions.module.js';
-import { f_o_sam_response } from './sam_functions.module.js';
-import { f_o_training_response } from './training_data_functions.module.js';
 import { f_o_camera_response } from './camera_functions.module.js';
 
 import {
@@ -41,13 +38,6 @@ import {
     f_o_locate_list_maps,
     f_s_locate_save_frame,
 } from "./locate_map.module.js";
-import {
-    f_o_cellpose_start,
-    f_cellpose_stop,
-    f_o_cellpose_status,
-    f_s_cellpose_save_frame,
-    f_o_cellpose_infer,
-} from "./cellpose_functions.module.js";
 import {
     f_o_recording_create,
     f_recording_write_manifest,
@@ -666,48 +656,6 @@ let f_handler = async function(o_request, o_conninfo) {
                 o_socket.send(JSON.stringify({ v_result: o_result, s_uuid: o_data.s_uuid }));
             }
 
-            // ── Cellpose cell segmentation (cellpose_worker.py) ────
-            if(o_data.s_type === 'cellpose_start'){
-                let o_result = { b_success: false, s_error: '' };
-                try {
-                    o_result = await f_o_cellpose_start(o_data.v_data || {});
-                } catch (o_error) {
-                    console.error('cellpose_start error:', o_error);
-                    o_result = { b_success: false, s_error: o_error.message };
-                }
-                o_socket.send(JSON.stringify({ v_result: o_result, s_uuid: o_data.s_uuid }));
-            }
-            if(o_data.s_type === 'cellpose_stop'){
-                let o_result = { b_success: false, s_error: '' };
-                try {
-                    o_result = await f_cellpose_stop();
-                } catch (o_error) {
-                    console.error('cellpose_stop error:', o_error);
-                    o_result = { b_success: false, s_error: o_error.message };
-                }
-                o_socket.send(JSON.stringify({ v_result: o_result, s_uuid: o_data.s_uuid }));
-            }
-            if(o_data.s_type === 'cellpose_status'){
-                o_socket.send(JSON.stringify({
-                    v_result: f_o_cellpose_status(),
-                    s_uuid: o_data.s_uuid,
-                }));
-            }
-            if(o_data.s_type === 'cellpose_infer'){
-                let o_result = { b_success: false, s_error: '' };
-                try {
-                    // the frame was uploaded to /api/cellpose/frame just before
-                    o_result = await f_o_cellpose_infer(
-                        o_data.v_data.n_seq,
-                        o_data.v_data.s_path_frame,
-                    );
-                } catch (o_error) {
-                    console.error('cellpose_infer error:', o_error);
-                    o_result = { b_success: false, s_error: o_error.message };
-                }
-                o_socket.send(JSON.stringify({ v_result: o_result, s_uuid: o_data.s_uuid }));
-            }
-
             if(o_data.s_type === 'compile_esp'){
                 let v = o_data.v_data;
                 let f_on_line = function(s_line, s_source){
@@ -742,9 +690,6 @@ let f_handler = async function(o_request, o_conninfo) {
 
     let o_url = new URL(o_request.url);
     let s_path = o_url.pathname;
-    if (s_path === '/api/training/sam/infer') return await f_o_sam_response(o_request);
-    if (s_path.startsWith('/api/training/yolo/')) return await f_o_yolo_response(o_request);
-    if (s_path.startsWith('/api/training/')) return await f_o_training_response(o_request);
     if (s_path.startsWith('/api/camera/')) return await f_o_camera_response(o_request);
 
     // exposed functions via HTTP
@@ -886,25 +831,6 @@ let f_handler = async function(o_request, o_conninfo) {
         }
     }
 
-    // cellpose frame upload endpoint: stores the camera frame and answers with
-    // the path + sequence the client then hands to the cellpose_infer message
-    if (s_path === '/api/cellpose/frame' && o_request.method === 'POST') {
-        try {
-            let a_n_byte = new Uint8Array(await o_request.arrayBuffer());
-            let o_frame = await f_s_cellpose_save_frame(a_n_byte);
-            return new Response(JSON.stringify({
-                b_success: true,
-                s_path_frame: o_frame.s_path,
-                n_seq: o_frame.n_seq,
-            }), {
-                headers: { 'content-type': 'application/json' },
-            });
-        } catch (o_error) {
-            console.error('cellpose frame upload error:', o_error);
-            return new Response('Error: ' + o_error.message, { status: 500 });
-        }
-    }
-
     // serve file from absolute path
     if (s_path === '/api/file') {
         let s_path_file = o_url.searchParams.get('path');
@@ -954,14 +880,3 @@ Deno.serve({
         console.log(`server running on http://localhost:${n_port}`);
     },
 }, f_handler);
-
-// the cellpose worker is a child process; take it down with the server
-for(let s_signal of ['SIGINT', 'SIGTERM']){
-    Deno.addSignalListener(s_signal, async function(){
-        try { await f_cellpose_stop(); } catch { /* nothing to stop */ }
-        Deno.exit(0);
-    });
-}
-globalThis.addEventListener('unload', function(){
-    f_cellpose_stop().catch(function(){});
-});

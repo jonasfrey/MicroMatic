@@ -950,7 +950,7 @@ let o_component__scale = {
         o_self._f_on_resize = function() { o_self.n_rev__layout++; };
         window.addEventListener('resize', o_self._f_on_resize);
         window.addEventListener('toolbar-resize', o_self._f_on_resize);
-        // the live image also changes its box without a window resize (training mode, crop)
+        // the live image also changes its box without a window resize (crop)
         let el_video = document.getElementById('webcamVideo');
         if (el_video && typeof ResizeObserver !== 'undefined') {
             o_self._o_observer = new ResizeObserver(o_self._f_on_resize);
