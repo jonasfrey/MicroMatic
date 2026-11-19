@@ -67,8 +67,8 @@ import {
 // image says which focus point is being taken, no motor can be moved by hand,
 // and "cancel" stops it without keeping an image.
 // Draft, not in a drawing yet: the model row with epochs, "live" / "done"
-// for a stored image opened from the image list, and the message of a running
-// capture.
+// for a stored image opened from the image list, and the message in the middle
+// of the image while a capture or a detection is running.
 
 let o_component__ml_training = {
     name: 'component-ml-training',
@@ -242,16 +242,16 @@ let o_component__ml_training = {
                             :f_select="f_select_model" :f_b_update="f_b_update_model" :f_delete="f_delete_model"
                             :f_create="f_pick_model_file" s_tooltip__create="Upload a YOLO .pt file trained elsewhere. Train makes a model from this dataset." />
                         <input ref="el_file__model" class="sr-only" type="file" accept=".pt" data-control-skip tabindex="-1" aria-label="Upload model" @change="f_on_model_file" />
+                        <button class="btn-small" @click="f_detect" :disabled="!o_state.o_ml_config.n_id__model || o_ml.s_activity !== ''" aria-label="detect objects"
+                            data-tooltip="Detect objects&#10;Apply the chosen model to the image. What it finds is shown dashed and is never saved. On the live image it goes as soon as X or Y moves."><ui_icon s_name="detection" /> detect objects</button>
                         <div class="cockpit-row">
                             <div class="cockpit-field ml-field--epoch" data-tooltip="Epochs&#10;How many times the training goes through all images.">
                                 <label for="ml-epoch">epochs</label>
                                 <input id="ml-epoch" type="number" data-control-skip min="1" max="1000" step="1" v-model.number="o_state.o_ml_config.n_epoch" @change="f_on_epoch_change" />
                             </div>
                             <button class="btn-small cockpit-grow" v-if="!b_job_active" @click="f_train" :disabled="o_ml.s_activity !== ''" aria-label="train"
-                                data-tooltip="Train&#10;Train a new model from the images marked as done. Needs at least 2 of them and 1 box."><ui_icon s_name="play" /> train</button>
+                                data-tooltip="Train&#10;Train a new model from the images marked as done. Needs at least 2 of them and 1 box."><ui_icon s_name="ml_brain_gear" /> train</button>
                             <button class="btn-small cockpit-grow" v-else @click="f_cancel_train" aria-label="cancel training" data-tooltip="Cancel the running training"><ui_icon s_name="stop" /> cancel</button>
-                            <button class="btn-small cockpit-grow" @click="f_detect" :disabled="!o_state.o_ml_config.n_id__model || o_ml.s_activity !== ''" aria-label="infer"
-                                data-tooltip="Infer&#10;Apply the chosen model to the image. Predictions are shown dashed and are never saved. On the live image they go as soon as X or Y moves."><ui_icon s_name="detection" /> infer</button>
                         </div>
                         <div class="cockpit-status" :class="s_class__job" role="status" v-if="s_status__job">{{ s_status__job }}</div>
                     </div>
@@ -271,11 +271,11 @@ let o_component__ml_training = {
                     </div>
                 </div>
             </div>
-            <div class="ml-progress-backdrop" v-if="o_ml.o_progress__capture">
-                <div class="ml-progress" role="status" data-tooltip="Capture · draft&#10;One image is taken at each focus point. Until the last one is stored no motor can be moved.">
+            <div class="ml-progress-backdrop" v-if="o_progress__stage">
+                <div class="ml-progress" role="status" :data-tooltip="o_progress__stage.s_tooltip">
                     <span class="ml-progress-spinner" aria-hidden="true"></span>
-                    <span class="ml-progress-text">{{ s_progress__capture }}</span>
-                    <button class="btn-small" data-control-skip @click="f_cancel_capture" :disabled="o_ml.o_progress__capture.b_cancel || o_ml.o_progress__capture.b_return" aria-label="cancel"
+                    <span class="ml-progress-text" :class="{ 'ml-progress-text--capture': o_ml.o_progress__capture }">{{ o_progress__stage.s_text }}</span>
+                    <button class="btn-small" v-if="o_ml.o_progress__capture" data-control-skip @click="f_cancel_capture" :disabled="o_ml.o_progress__capture.b_cancel || o_ml.o_progress__capture.b_return" aria-label="cancel"
                         data-tooltip="Cancel&#10;Stop taking images. No image of this capture is kept, the boxes stay on the image.">cancel</button>
                 </div>
             </div>
@@ -356,6 +356,18 @@ let o_component__ml_training = {
             if(o_progress.b_cancel) return 'cancelling';
             if(o_progress.b_return) return 'returning focus';
             return 'capturing focus point ' + (o_progress.n_idx + 1) + '/' + o_progress.n_cnt;
+        },
+        // what the middle of the image says while the application is at work on it: { s_text, s_tooltip }, null otherwise
+        o_progress__stage: function() {
+            if(o_ml.o_progress__capture) return {
+                s_text: this.s_progress__capture,
+                s_tooltip: 'Capture · draft\nOne image is taken at each focus point. Until the last one is stored no motor can be moved.',
+            };
+            if(o_ml.s_activity === 'detect') return {
+                s_text: 'detecting objects',
+                s_tooltip: 'Detect objects · draft\nThe model looks for objects on the image. On the live image nothing is shown when X or Y moves meanwhile.',
+            };
+            return null;
         },
         // the image captured last
         o_image__last: function() {

@@ -2868,8 +2868,8 @@ body.ml-annotating .mouse-jog-overlay { visibility: hidden; }
   animation: ml-progress-spin 0.9s linear infinite;
 }
 @keyframes ml-progress-spin { to { transform: rotate(360deg); } }
-/* the longest text is "capturing focus point 1/9": the button does not jump when the text changes */
-.ml-progress-text { min-width: 25ch; }
+/* the longest text of a capture is "capturing focus point 1/9": the button does not jump when the text changes */
+.ml-progress-text--capture { min-width: 25ch; }
 .ml-progress .btn-small { margin: 0; padding: 5px 14px; }
 .ml-progress .btn-small:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 1px; }
 
@@ -2880,6 +2880,9 @@ body.ml-annotating .mouse-jog-overlay { visibility: hidden; }
 .ml-library-item.active { border-color: var(--accent-1); }
 .ml-library-open { width: 100%; height: 100%; padding: 0; border: 0; background: transparent; color: var(--dim); cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .ml-library-open img { width: 100%; height: 100%; object-fit: contain; }
+/* the boxes of an image on its thumbnail, in the colours of their classes. the drawing is fitted like the image. */
+.ml-library-bbox { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.ml-library-bbox rect { fill: color-mix(in srgb, currentColor 10%, transparent); stroke: currentColor; stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
 .ml-library-count, .ml-library-done { position: absolute; top: 3px; display: inline-flex; align-items: center; justify-content: center; height: 18px; border-radius: 9px; background: #000c; pointer-events: none; }
 .ml-library-count { left: 3px; min-width: 18px; padding: 0 5px; font: 700 0.6rem 'JetBrains Mono', monospace; color: var(--text); }
 .ml-library-done { left: 28px; width: 18px; color: var(--accent-1); }

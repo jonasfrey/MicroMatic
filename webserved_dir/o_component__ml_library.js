@@ -1,9 +1,11 @@
 import { o_state } from './index.js';
-import { o_ml, f_open_image, f_delete_image, f_load_thumbnail } from './o_ml.module.js';
+import { o_ml, f_o_class, f_open_image, f_delete_image, f_load_thumbnail } from './o_ml.module.js';
 import { o_component__icon } from './o_component__icon.js';
+import { f_o_edge } from './ml_bbox.module.js';
 
 // Images of the current dataset, newest first. Opened by a click on the
 // thumbnail in the ML Training window; a click on an image puts it on the stage.
+// Every thumbnail shows the boxes of its image, in the colours of their classes.
 
 // a thumbnail is fetched when its tile scrolls into view, not for the whole dataset at once
 let o_observer = null;
@@ -61,6 +63,10 @@ let o_component__ml_library = {
                             <img v-if="o_ml.o_s_url__thumbnail[o_image.n_id]" :src="o_ml.o_s_url__thumbnail[o_image.n_id]" alt="" draggable="false" />
                             <ui_icon v-else s_name="image" />
                         </button>
+                        <svg class="ml-library-bbox" v-if="o_ml.o_s_url__thumbnail[o_image.n_id] && o_image.a_o_bbox.length"
+                            :viewBox="'0 0 ' + o_image.n_scl_x + ' ' + o_image.n_scl_y" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                            <rect v-for="(o_bbox, n_idx) in o_image.a_o_bbox" :key="n_idx" v-bind="f_o_rect(o_image, o_bbox)" :style="{ color: f_s_color(o_bbox) }" />
+                        </svg>
                         <span class="ml-library-count">{{ o_image.a_o_bbox.length }}</span>
                         <span class="ml-library-done" v-if="o_image.b_done"><ui_icon s_name="check" /></span>
                         <button class="cockpit-icon-button danger ml-library-delete" data-control-skip @click="f_delete(o_image)"
@@ -86,6 +92,20 @@ let o_component__ml_library = {
     },
     methods: {
         f_open_image,
+        // svg attributes of a box, in the pixels of its image
+        f_o_rect: function(o_image, o_bbox) {
+            let o_edge = f_o_edge(o_bbox);
+            return {
+                x: o_edge.n_x__min * o_image.n_scl_x,
+                y: o_edge.n_y__min * o_image.n_scl_y,
+                width: o_bbox.n_scl_x_nor * o_image.n_scl_x,
+                height: o_bbox.n_scl_y_nor * o_image.n_scl_y,
+            };
+        },
+        f_s_color: function(o_bbox) {
+            let o_class = f_o_class(o_bbox.n_o_class_n_id);
+            return o_class ? o_class.s_color_hex : '#ffffff';
+        },
         f_s_tooltip: function(o_image) {
             return new Date(o_image.n_ts_ms__created).toLocaleString() + '\n'
                 + o_image.a_o_bbox.length + ' boxes · ' + (o_image.b_done ? 'done' : 'not done') + '\n'

@@ -861,6 +861,29 @@ Deno.test('ML Training window: from login to a trained model', async () => {
         await f_v_page(`await o_test.f_click('Images'); await o_test.f_wait(() => o_test.f_el('.ml-library') && document.querySelectorAll('.ml-library-item img').length === 4, 'thumbnails');`);
         assert.deepEqual(await f_v_page(`return [...document.querySelectorAll('.ml-library-item')].map(el => el.querySelector('.ml-library-count').textContent + (el.classList.contains('done') ? ' done' : ''));`),
             ['1 done', '1 done', '0 done', '1 done']);
+        // every thumbnail shows the boxes of its image where they lie on it, in the colour of their class
+        let a_a_o_rect = await f_v_page(`return [...document.querySelectorAll('.ml-library-item')].map(el => {
+            let o_img = el.querySelector('img').getBoundingClientRect();
+            return [...el.querySelectorAll('.ml-library-bbox rect')].map(el_rect => {
+                let o = el_rect.getBoundingClientRect();
+                return { n_x: (o.left - o_img.left) / o_img.width, n_y: (o.top - o_img.top) / o_img.height, n_scl_x: o.width / o_img.width, n_scl_y: o.height / o_img.height, s_color: getComputedStyle(el_rect).color };
+            });
+        });`);
+        assert.deepEqual(a_a_o_rect.map(a_o_rect => a_o_rect.length), [1, 1, 0, 1]);
+        let a_o_class__server = (await f_o_request(o_server, 'GET', '/api/dataset/1', { s_token })).v_body.a_o_class;
+        // the tiles are newest first, the images of the data server oldest first
+        for(let [n_idx, o_image] of (await f_a_o_image()).reverse().entries()){
+            for(let [n_idx__bbox, o_bbox] of o_image.a_o_bbox.entries()){
+                let o_rect = a_a_o_rect[n_idx][n_idx__bbox];
+                let s_what = 'box on the thumbnail of image ' + o_image.n_id;
+                f_near(o_rect.n_x, o_bbox.n_trn_x_center_nor - o_bbox.n_scl_x_nor / 2, s_what + ': left');
+                f_near(o_rect.n_y, o_bbox.n_trn_y_center_nor - o_bbox.n_scl_y_nor / 2, s_what + ': top');
+                f_near(o_rect.n_scl_x, o_bbox.n_scl_x_nor, s_what + ': width');
+                f_near(o_rect.n_scl_y, o_bbox.n_scl_y_nor, s_what + ': height');
+                let s_color_hex = a_o_class__server.find(o_class => o_class.n_id === o_bbox.n_o_class_n_id).s_color_hex;
+                assert.equal(o_rect.s_color, 'rgb(' + [1, 3, 5].map(n => parseInt(s_color_hex.slice(n, n + 2), 16)).join(', ') + ')', s_what + ': colour');
+            }
+        }
         await f_screenshot('6-library');
         await f_v_page(`await o_test.f_click('Open image 1'); await o_test.f_wait(() => o_test.o_ml.o_image?.n_id === 1 && o_test.o_ml.a_o_bbox.length === 1 && !o_test.f_el('.ml-library'), 'image 1 open');`);
         assert.deepEqual(await f_v_page(`return [o_test.f_a_s_box(), !!o_test.f_el('.ml-stage--live'), !!o_test.f_el('.ml-still'), o_test.f_s_status(), o_test.f_el_button('done').classList.contains('active')];`),
@@ -938,8 +961,26 @@ Deno.test('ML Training window: from login to a trained model', async () => {
         await f_v_page(`await o_test.f_key('Escape'); await o_test.f_tick();`);
         assert.equal((await f_o_request(o_server, 'GET', '/api/model', { s_token })).v_body.a_o_model.length, 1);
 
-        // ── infer on the live image: the prediction is drawn on it, nothing is frozen, nothing stored ──
-        await f_v_page(`await o_test.f_click('infer'); await o_test.f_wait(() => o_test.o_ml.a_o_prediction.length === 1 && o_test.f_el('.ml-prediction'), 'prediction');`);
+        // ── the buttons say what they do: "train" with its pictogram, "detect objects" instead of "infer" ──
+        assert.deepEqual(await f_v_page(`return [o_test.f_el_button('train').querySelector('svg path').getAttribute('d').slice(0, 15), o_test.f_el_button('detect objects').textContent.trim(), !!o_test.f_el_button('infer'),
+            o_test.f_el_button('detect objects').dataset.tooltip.split('\\n')[0]];`), ['M12 3.5A3.2 3.2', 'detect objects', false, 'Detect objects']);
+        // "detect objects" has a line of its own below the model it uses; its words fit, and so do those of "train"
+        assert.deepEqual(await f_v_page(`let o_model = o_test.f_el('.ml-model').getBoundingClientRect(); let o_dock = o_test.f_el('.ml-dock').getBoundingClientRect();
+            let [el_detect, el_train] = ['detect objects', 'train'].map(s => o_test.f_el_button(s)); let o_detect = el_detect.getBoundingClientRect();
+            return [o_detect.top >= o_model.bottom, el_train.getBoundingClientRect().top >= o_detect.bottom, Math.round(o_detect.width) === Math.round(o_model.width), o_detect.right <= o_dock.right,
+                el_detect.scrollWidth <= el_detect.clientWidth, el_train.scrollWidth <= el_train.clientWidth];`), [true, true, true, true, true, true]);
+
+        // ── detect objects on the live image: the prediction is drawn on it, nothing is frozen, nothing stored ──
+        // while the model is at work the middle of the image says so
+        assert.deepEqual(await f_v_page(`let a_s_text = []; let b_cancel = false;
+            let n_id__interval = setInterval(() => {
+                let el = o_test.f_el('.ml-progress-text');
+                if(el && a_s_text.at(-1) !== el.textContent.trim()) a_s_text.push(el.textContent.trim());
+                if(o_test.f_el_button('cancel')) b_cancel = true;
+            }, 2);
+            await o_test.f_click('detect objects'); await o_test.f_wait(() => o_test.o_ml.a_o_prediction.length === 1 && o_test.f_el('.ml-prediction'), 'prediction');
+            clearInterval(n_id__interval);
+            return [a_s_text, b_cancel, !!o_test.f_el('.ml-progress')];`), [['detecting objects'], false, false]);
         assert.equal(await f_v_page(`return o_test.f_el('.ml-prediction text').textContent.trim();`), 'ceratium 90%');
         assert.deepEqual(await f_v_page(`return [o_test.o_ml.o_image, o_test.o_ml.b_still, !!o_test.f_el('.ml-stage.ml-stage--live'), o_test.f_s_status()];`), [null, false, true, '1 prediction']);
         assert.equal((await f_a_o_image()).length, 4);
@@ -947,19 +988,19 @@ Deno.test('ML Training window: from login to a trained model', async () => {
         assert.deepEqual(await f_v_page(`return [await o_test.f_s_move(2, 5), o_test.o_ml.a_o_prediction.length];`), ['moved', 1]);
         assert.deepEqual(await f_v_page(`let s_move = await o_test.f_s_move(0, 10); let n_cnt = o_test.o_ml.a_o_prediction.length; await o_test.f_tick();
             return [s_move, n_cnt, !!o_test.f_el('.ml-prediction'), o_test.f_s_status()];`), ['moved', 0, false, '']);
-        await f_v_page(`await o_test.f_click('infer'); await o_test.f_wait(() => o_test.f_el('.ml-prediction'), 'prediction again');`);
+        await f_v_page(`await o_test.f_click('detect objects'); await o_test.f_wait(() => o_test.f_el('.ml-prediction'), 'prediction again');`);
         assert.deepEqual(await f_v_page(`let o_index = await import('./index.js'); o_index.f_send_esp({ motor: 1, command: 'runContinuous', n_rpm: 5, direction: 'cw' }); await o_test.f_tick();
             return [o_test.o_ml.a_o_prediction.length, !!o_test.f_el('.ml-prediction')];`), [0, false]);
         // the stage moves while the model is asked: the answer belongs to another field of view and is not shown
-        await f_v_page(`o_test.f_el_button('infer').click(); await o_test.f_s_move(1, 10); await o_test.f_wait(() => o_test.o_ml.s_activity === '', 'the answer of the model');`);
+        await f_v_page(`o_test.f_el_button('detect objects').click(); await o_test.f_s_move(1, 10); await o_test.f_wait(() => o_test.o_ml.s_activity === '', 'the answer of the model');`);
         assert.deepEqual(await f_v_page(`return [o_test.o_ml.a_o_prediction.length, o_test.o_ml.s_error];`), [0, '']);
-        // while X or Y is moving there is nothing to infer on
-        await f_v_page(`o_test.o_state.a_o_motor[1].b_running = true; await o_test.f_click('infer'); await o_test.f_wait(() => o_test.o_ml.s_activity === '', 'refused');`);
+        // while X or Y is moving there is nothing to detect on
+        await f_v_page(`o_test.o_state.a_o_motor[1].b_running = true; await o_test.f_click('detect objects'); await o_test.f_wait(() => o_test.o_ml.s_activity === '', 'refused');`);
         assert.match(await f_v_page(`return o_test.o_ml.s_error;`), /X or Y is moving/);
         assert.equal(await f_v_page(`return o_test.o_ml.a_o_prediction.length;`), 0);
         await f_v_page(`o_test.o_state.a_o_motor[1].b_running = false; o_test.o_state.a_o_toast.length = 0;`);
         // with the prediction as a guide a box is drawn. the box holds the field of view, so the prediction stays too.
-        await f_v_page(`await o_test.f_click('infer'); await o_test.f_wait(() => o_test.f_el('.ml-prediction'), 'prediction for the box');`);
+        await f_v_page(`await o_test.f_click('detect objects'); await o_test.f_wait(() => o_test.f_el('.ml-prediction'), 'prediction for the box');`);
         await f_drag(0.2, 0.2, 0.4, 0.4);
         assert.deepEqual(await f_v_page(`return [o_test.f_a_s_box(), o_test.f_s_status()];`), [['1ceratium'], '1 box · 1 prediction · x · y locked']);
         assert.match(await f_v_page(`return await o_test.f_s_move(0, 10);`), /locked/);
@@ -976,7 +1017,7 @@ Deno.test('ML Training window: from login to a trained model', async () => {
         // a stored image: the prediction belongs to the image, so the motors do not take it away; "live" does
         await f_v_page(`await o_test.f_click('Images'); await o_test.f_wait(() => o_test.f_el('.ml-library'), 'library');
             await o_test.f_click('Open image 1'); await o_test.f_wait(() => o_test.o_ml.o_image?.n_id === 1, 'stored image');
-            await o_test.f_click('infer'); await o_test.f_wait(() => o_test.f_el('.ml-prediction'), 'prediction on the stored image');`);
+            await o_test.f_click('detect objects'); await o_test.f_wait(() => o_test.f_el('.ml-prediction'), 'prediction on the stored image');`);
         assert.deepEqual(await f_v_page(`return [await o_test.f_s_move(0, 10), o_test.o_ml.a_o_prediction.length, !!o_test.f_el('.ml-stage--live')];`), ['moved', 1, false]);
         await f_v_page(`await o_test.f_click('live'); await o_test.f_wait(() => !o_test.o_ml.b_still, 'live again');`);
         assert.deepEqual(await f_v_page(`return [o_test.o_ml.a_o_prediction.length, o_test.o_ml.a_o_bbox.length, o_test.f_s_status()];`), [0, 0, '']);

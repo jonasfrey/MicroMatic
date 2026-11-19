@@ -81,7 +81,7 @@ let o_ml = reactive({
     o_progress__capture: null,
     s_status__save: '',          // '' | 'saving' | 'saved' | 'error'
     // what the model found on what the stage shows: on the stored image, or on the
-    // camera image as it was when "infer" was clicked. on the camera image it
+    // camera image as it was when "detect objects" was clicked. on the camera image it
     // goes as soon as X or Y moves.
     a_o_prediction: [],
     b_prediction: true,
