@@ -137,10 +137,12 @@ for(const s_input of ['keyboard', 'mouse', 'gamepad']) {
         const s_source = await Deno.readTextFile(new URL('../webserved_dir/index.js', import.meta.url));
         const a_s_function = ['f_n_motor__axis', 'f_send_esp', 'f_send_esp_run_continuous', 'f_send_esp_stop'];
         const a_s_message = [];
-        const o_command = new Function('o_state', 'o_writer__serial',
+        // f_send_esp asks the real guard of a held field of view; nothing holds it here
+        const { f_b_command__refused } = await import('../webserved_dir/view_hold.module.js');
+        const o_command = new Function('o_state', 'o_writer__serial', 'f_b_command__refused',
             a_s_function.map(s_name => s_source.match(new RegExp('let ' + s_name + ' = [\\s\\S]*?\\n};'))[0]).join('\n')
             + '\nreturn { ' + a_s_function.join(', ') + ' };'
-        )(state, { write: a_n_byte => { a_s_message.push(JSON.parse(new TextDecoder().decode(a_n_byte))); return Promise.resolve(); } });
+        )(state, { write: a_n_byte => { a_s_message.push(JSON.parse(new TextDecoder().decode(a_n_byte))); return Promise.resolve(); } }, f_b_command__refused);
         const o_pad = { index: 0, id: 'test', connected: true, axes: [0, 0, 0, 0], buttons: [] };
         const o_component = await component('jog', {
             o_state: state, f_n_rpm__manual, ...o_command,

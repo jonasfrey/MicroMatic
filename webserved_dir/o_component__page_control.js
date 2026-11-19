@@ -10,6 +10,8 @@ let o_component__page_control = {
         <o_component__scale />
         <o_component__focus_step />
         <o_component__toolbar />
+        <o_component__ml_training />
+        <o_component__motor_readout />
         <o_component__setup />
         <o_component__map />
         <o_component__motion_detection />

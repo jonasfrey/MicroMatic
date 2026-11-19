@@ -43,6 +43,7 @@ install is reported before a scan is started rather than after it.
 | `deno task install` | install only, do not start the server |
 | `deno task server` | start the server without the dependency check |
 | `deno task flash` | the guided flashing wizard (`startup.js`) |
+| `deno task dataserver` | start the data server for the ML Training window, see `dataserver/readme_mgc.md` |
 
 `deno task install --skip-stitch-ai` leaves out torch/lightglue/kornia if you do not need
 autostitch or the LoFTR rescue matcher. `stitch.py` itself only needs numpy + opencv.

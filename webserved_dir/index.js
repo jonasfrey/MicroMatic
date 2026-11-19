@@ -3,12 +3,14 @@ import { f_o_motion_config } from './motion_detection.module.js';
 import { o_component__motion_detection } from './o_component__motion_detection.js';
 import { f_o_manual_speed } from './manual_speed.module.js';
 import { o_component__manual_speed } from './o_component__manual_speed.js';
+import { o_component__motor_readout } from './o_component__motor_readout.js';
 import { o_component__actions } from './o_component__actions.js';
 import { f_install_control_catalog } from './control_catalog.module.js';
 import { f_a_control_effects } from './control_effects.module.js';
 import { f_wait_for_esp_status } from './serial_handshake.module.js';
 import { f_o_hardware_led_config } from './hardware_led.module.js';
 import { f_o_size__default, f_o_size } from './scale_calibration.module.js';
+import { f_b_command__refused } from './view_hold.module.js';
 import { createApp, reactive, watch, markRaw } from 'vue';
 import { createRouter, createWebHistory } from 'vue-router';
 import {
@@ -49,6 +51,7 @@ import { o_component__setup } from './o_component__setup.js';
 import { o_component__hardware_led } from './o_component__hardware_led.js';
 import { o_component__page_control } from './o_component__page_control.js';
 import { o_component__stats } from './o_component__stats.js';
+import { o_component__ml_training } from './o_component__ml_training.js';
 
 // ─── Statistics (client-side, derived from the ESP status stream) ──
 
@@ -78,6 +81,8 @@ let o_state = reactive({
 
     // DB-backed data
     a_o_setting: [],
+    // true once the stored settings have arrived and are applied to this state
+    b_applied__setting: false,
     a_o_wsclient: [],
     a_o_model,
 
@@ -242,8 +247,18 @@ let o_state = reactive({
 
     // UI
     o_motion_detection: f_o_motion_config(),
-    o_panel_visibility: { motion_detection: false, setup: false, map: false, gamepad: false, slide_library: false, scan: false, camera_setting: false, led_setting: false, macro: false, auto_move: false, autostitch: false, calibration: false, focus: false, focus_step: false, focus_stack: false, scale: false, stats: false, zoom: false, record: false, recording_library: false, video: false },
+    o_panel_visibility: { motion_detection: false, setup: false, map: false, gamepad: false, slide_library: false, scan: false, camera_setting: false, led_setting: false, macro: false, auto_move: false, autostitch: false, calibration: false, focus: false, focus_step: false, focus_stack: false, scale: false, stats: false, zoom: false, record: false, recording_library: false, video: false, ml_training: false },
     o_key_held: {},
+
+    // ML Training window: what the workstation remembers between sessions.
+    // the data itself lives on the data server (o_ml.module.js)
+    o_ml_config: {
+        n_id__dataset: 0,
+        s_name__microscope: '',
+        s_name__calibration: '',
+        n_id__model: 0,
+        n_epoch: 50,
+    },
 
     // scan
     b_scanning: false,
@@ -485,6 +500,8 @@ let f_apply_setting_from_db = function(){
     o_state.o_panel_visibility.record = o_vis.record || false;
     o_state.o_panel_visibility.recording_library = o_vis.recording_library || false;
     o_state.o_panel_visibility.video = o_vis.video || false;
+    o_state.o_panel_visibility.ml_training = o_vis.ml_training || false;
+    Object.assign(o_state.o_ml_config, f_get_json('o_ml_config', {}));
 
     // recording setup (interval, positions, autofocus, format …)
     Object.assign(o_state.o_record_config, f_get_json('o_record_config', {}));
@@ -540,6 +557,8 @@ let f_apply_setting_from_db = function(){
     o_state.o_config__hardware_led = f_o_hardware_led_config(f_get_json('o_config__hardware_led', {}));
     o_state.a_o_pin_config = f_get_json('a_o_pin_config', o_state.a_o_pin_config)
         .map((o_pin, n_idx) => ({ ...o_pin, s_name: 'Motor ' + (n_idx + 1) }));
+
+    o_state.b_applied__setting = true;
 
     // auto-redirect: if ESP IP is known, try to connect and go to control page
     f_try_open_setup();
@@ -968,6 +987,9 @@ let f_connect_esp__auto = async function() {
 // ─── Send ───────────────────────────────────────────────────────────
 
 let f_send_esp = function(o_msg) {
+    // X and Y stay where they are while a tool holds the field of view, every motor while it takes its images
+    if (f_b_command__refused(o_msg, o_state.o_motor__axis)) return;
+
     // record macro commands (skip status polls)
     if (o_state.b_recording__macro && o_msg.command !== 'status' && o_msg.command !== 'setBacklash') {
         let n_ts_ms_now = Date.now();
@@ -997,6 +1019,10 @@ let f_send_esp_run_continuous = function(n_motor, n_rpm, s_direction) {
 
 let f_send_esp_move_step = function(n_motor, n_step, n_rpm) {
     if(!Number.isInteger(n_motor) || n_motor < 0 || n_motor > 2) return Promise.reject(new Error('No motor assigned to this axis'));
+    // a refused move never reports its end: say so instead of waiting for it
+    if(f_b_command__refused({ motor: n_motor, command: 'moveSteps' }, o_state.o_motor__axis)){
+        return Promise.reject(new Error('This motor is locked while the field of view is held'));
+    }
     return new Promise(function(resolve) {
         if (!f_b_esp_connected()) {
             resolve(0);
@@ -1037,7 +1063,7 @@ let f_send_esp_set_backlash = function(n_motor, n_step__backlash) {
 
 let f_send_esp_circle_start = function(n_step__radius, n_rpm, b_loop) {
     return new Promise(function(resolve) {
-        if (!f_b_esp_connected()) {
+        if (!f_b_esp_connected() || f_b_command__refused({ command: 'circleStart' }, o_state.o_motor__axis)) {
             resolve('error');
             return;
         }
@@ -1138,8 +1164,10 @@ o_app.component('o_component__backlash', o_component__backlash);
 o_app.component('o_component__slide_library', o_component__slide_library);
 o_app.component('o_component__motion_detection', o_component__motion_detection);
 o_app.component('o_component__stats', o_component__stats);
+o_app.component('o_component__ml_training', o_component__ml_training);
 
 o_app.component('o_component__manual_speed', o_component__manual_speed);
+o_app.component('o_component__motor_readout', o_component__motor_readout);
 f_install_control_catalog(o_app, {
     components: o_app._context.components,
     openPanel(panel) {

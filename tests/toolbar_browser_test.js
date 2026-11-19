@@ -94,11 +94,14 @@ for (const width of [1440, 800, 360, 320]) Deno.test(`compact toolbar actions an
                     check(rect.x >= 0 && rect.right <= innerWidth && rect.bottom <= initialHeight, 'Fixed control outside bar');
                 }
                 check(bar.scrollWidth <= innerWidth, 'Toolbar overflow');
-                await click('LED settings');
-                check(o_state.o_panel_visibility.led_setting && !o_state.o_panel_visibility.setup && calls.settings.o_panel_visibility.led_setting, 'LED settings open directly and persist without Setup');
-                check(button('LED settings').getAttribute('aria-pressed') === 'true', 'LED toolbar button reflects panel visibility');
-                await click('LED settings');
-                check(!o_state.o_panel_visibility.led_setting, 'LED toolbar button closes panel');
+                // the LED has no button of its own in the bar: it is one of the tools
+                check(!button('LED settings') && !bar.querySelector('.toolbar-row--primary [data-tool="led_setting"]'), 'No LED button in the bar');
+                await choose('led_setting');
+                check(o_state.o_panel_visibility.led_setting && !o_state.o_panel_visibility.setup && calls.settings.o_panel_visibility.led_setting, 'LED settings open from the tools and persist without Setup');
+                await openTools();
+                check(tool('led_setting').getAttribute('aria-pressed') === 'true', 'LED tool reflects panel visibility');
+                await choose('led_setting');
+                check(!o_state.o_panel_visibility.led_setting && !visible(document.querySelector('#toolbar-tools')), 'LED tool closes panel');
                 await click('Capture Image'); check(calls.capture === 1 && window.downloadName.startsWith('capture-'), 'Capture dispatch');
                 await click('Mouse movement'); check(o_state.b_enabled__mouse_jog && button('Mouse movement').getAttribute('aria-pressed') === 'true', 'Mouse movement dispatch');
                 await click('Reset Mouse movement'); check(!o_state.b_enabled__mouse_jog, 'Mouse movement can be reset directly');

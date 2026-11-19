@@ -2164,6 +2164,30 @@ input[type="range"]::-moz-range-thumb {
   .toolbar-tools { width: 680px; }
   .toolbar-tools-groups { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 12px; }
 }
+/* the keys that drive the motors, as they lie on the keyboard, and where the
+   three axes stand (draft). a pressed key lights up; the caps are dimmed while
+   the keys move nothing. */
+#toolbar-motor:empty { display: none; }
+.motor-key-grid { display: grid; grid-template-columns: repeat(3, 16px); grid-auto-rows: 16px; gap: 2px; flex: 0 0 auto; }
+.motor-key {
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+  border: 1px solid #464650; border-radius: 3px; color: #b8b8c2;
+  font: 700 0.56rem/1 'JetBrains Mono', monospace;
+}
+.motor-key-grid.idle .motor-key:not(.pressed) { border-color: var(--border); color: var(--dim); }
+.motor-key.pressed { background: var(--accent-1); border-color: var(--accent-1); color: #000; }
+.motor-position {
+  display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px; flex: 0 0 auto;
+  border: 1px solid var(--border); border-radius: 6px; color: var(--text);
+  font: 0.68rem 'JetBrains Mono', monospace; white-space: nowrap;
+}
+/* the numbers keep their place while they count */
+.motor-position span { display: inline-flex; justify-content: space-between; gap: 4px; min-width: 8ch; }
+.motor-position b { font-weight: 400; color: var(--dim); }
+/* no room for it on a narrow window */
+@media (max-width: 1100px) {
+  .toolbar-group--motor { display: none; }
+}
 @media (max-width: 600px) {
   .toolbar-row--primary { padding: 6px; gap: 6px; }
   .toolbar-group { gap: 4px; }
@@ -2600,3 +2624,265 @@ input[type="range"]::-moz-range-thumb {
 .size-snapshot { flex: 0 0 auto; display: block; line-height: 0; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
 .size-snapshot:hover, .size-snapshot:focus-visible { border-color: var(--text); }
 .size-snapshot :is(img, svg) { display: block; width: 112px; height: 63px; object-fit: cover; background: #000; }
+
+/* ═══ ML Training ═════════════════════════════════════════════════════════
+   The window is docked to the right edge instead of floating. While it is
+   open the camera image keeps clear of the top bar and the dock, so nothing
+   lies on the image while bounding boxes are drawn. */
+:root { --ml-dock-w: 0px; }
+body.ml-docked { --ml-dock-w: 304px; }
+body.ml-docked :is(#webcamVideo, #webcamFrame, .filter-canvas, .auto-move-overlay, #webcamPlaceholder, .capture-flash, .mouse-jog-overlay, .marker-overlay) {
+  inset: var(--topbar-h) auto auto 0;
+  width: calc(100vw - var(--ml-dock-w)); height: calc(100dvh - var(--topbar-h));
+}
+
+.overlay-panel.ml-dock {
+  top: var(--topbar-h); right: 0; bottom: 0; width: var(--ml-dock-w);
+  max-height: none; border-width: 0 0 0 1px; border-radius: 0; box-shadow: none;
+  background: var(--surface-solid); backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.ml-dock-header { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 5px 6px 5px 12px; border-bottom: 1px solid var(--border); }
+.ml-dock-header h2 { display: flex; align-items: center; gap: 7px; margin-right: auto; font-size: 0.82rem; font-weight: 600; white-space: nowrap; }
+.ml-dock-header h2 .ui-icon { width: 17px; height: 17px; flex-basis: 17px; color: var(--accent-1); }
+.ml-dock-header .panel-state { font: 0.6rem 'JetBrains Mono', monospace; color: var(--dim); white-space: nowrap; }
+.ml-dock-header .panel-state.running { color: var(--accent-1); }
+.ml-dock-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 10px 12px 12px; display: flex; flex-direction: column; }
+.ml-dock-body > .cockpit-footer { margin-top: auto; }
+.ml-dock .cockpit-footer > .btn-small { width: 100%; margin-left: 0; }
+.ml-dock .cockpit-row .btn-small { margin-left: 0; }
+.ml-dock .btn-small.active { color: var(--accent-1); border-color: var(--accent-1); }
+.ml-field--epoch { flex: 0 0 64px; }
+.ml-dock .cockpit-footer .cockpit-row { align-items: flex-end; }
+.ml-dock .cockpit-footer .ml-head--model { margin: 4px 0 -2px; }
+/* a label with its pictogram: dataset, microscope, objective */
+.ml-label { display: flex; align-items: center; gap: 5px; }
+.ml-label .ui-icon { width: 14px; height: 14px; flex-basis: 14px; }
+.ml-dock :is(.ml-dataset, .ml-model) { display: flex; width: 100%; height: 30px; }
+
+/* classes: key, colour, name, change order, delete */
+.ml-class-list { display: flex; flex-direction: column; gap: 3px; max-height: 262px; }
+.ml-class { display: flex; align-items: center; gap: 5px; padding: 2px 3px; border: 1px solid transparent; border-radius: 6px; cursor: pointer; }
+.ml-class:hover { background: rgba(255,255,255,0.06); }
+.ml-class.active { background: rgba(255,255,255,0.1); border-color: var(--accent-1); }
+.ml-class.moving { background: rgba(255,255,255,0.16); }
+.ml-class--new { cursor: default; }
+.ml-class--new:hover { background: transparent; }
+.ml-class-key {
+  flex: 0 0 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: 50%; font: 700 0.62rem 'JetBrains Mono', monospace; color: var(--dim);
+}
+.ml-class.active .ml-class-key { color: var(--text); border-color: var(--text); }
+.ml-class--new .ml-class-key { border-color: transparent; }
+.ml-dock input.ml-class-color { flex: 0 0 20px; width: 20px; height: 20px; min-height: 0; padding: 0; border: 0; border-radius: 4px; background: transparent; cursor: pointer; }
+.ml-class-color::-webkit-color-swatch-wrapper { padding: 0; }
+.ml-class-color::-webkit-color-swatch { border: 1px solid var(--border); border-radius: 4px; }
+.ml-dock input.ml-class-name { flex: 1 1 0; min-width: 0; }
+.ml-class .cockpit-icon-button { width: 22px; height: 22px; }
+.ml-class-order { cursor: grab; touch-action: none; }
+.ml-class.moving .ml-class-order { cursor: grabbing; color: var(--text); border-color: var(--text); }
+
+/* the image captured last, and what is on the stage */
+.ml-image-row { display: flex; gap: 8px; align-items: stretch; }
+.ml-thumbnail {
+  flex: 0 0 112px; height: 84px; padding: 0; display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: 6px; background: #000; color: var(--dim); cursor: pointer; overflow: hidden;
+  /* the sheets behind it say: there are more images */
+  box-shadow: 3px 3px 0 -1px var(--surface-solid), 3px 3px 0 0 var(--border), 6px 6px 0 -1px var(--surface-solid), 6px 6px 0 0 var(--border);
+  margin: 0 6px 6px 0;
+}
+.ml-thumbnail:hover:not(:disabled) { border-color: var(--text); }
+.ml-thumbnail:disabled { cursor: not-allowed; opacity: 0.5; }
+.ml-thumbnail img { width: 100%; height: 100%; object-fit: contain; }
+.ml-image-action { flex: 1 1 0; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.ml-image-action .cockpit-status:empty { display: none; }
+
+/* focus points: folded away until they are asked for */
+.ml-fold { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent; color: var(--dim); cursor: pointer; }
+.ml-fold .ui-icon { width: 13px; height: 13px; flex-basis: 13px; transform: rotate(-90deg); transition: transform 0.12s; }
+.ml-fold[aria-expanded="true"] .ui-icon { transform: none; }
+.ml-fold .cockpit-label { font-weight: 700; cursor: pointer; }
+.ml-fold:hover, .ml-fold:hover .cockpit-label { color: var(--text); }
+.ml-dock .cockpit-section-head:has(.ml-fold) { margin-bottom: 0; min-height: var(--cockpit-control); }
+.ml-dock input.ml-focus-count { width: 48px; margin-left: auto; }
+.ml-focus-list { display: flex; flex-direction: column; gap: 3px; margin-top: 5px; }
+.ml-focus { display: flex; align-items: center; gap: 8px; }
+.ml-focus-number { flex: 0 0 20px; text-align: center; font: 700 0.62rem 'JetBrains Mono', monospace; color: var(--dim); }
+.ml-focus .cockpit-readout { flex: 1 1 0; text-align: right; }
+.ml-dock .ml-capture { width: 100%; min-height: 32px; }
+
+/* slide, organisation and person in the top bar, at all times; µm per px and
+   px per step join them while the window is open */
+#toolbar-ml:empty { display: none; }
+.toolbar-group--ml { min-width: 0; flex-shrink: 1; overflow: hidden; }
+.ml-chip {
+  display: inline-flex; align-items: center; gap: 5px; height: 36px; padding: 0 8px; min-width: 0;
+  border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text);
+  font: 0.68rem 'JetBrains Mono', monospace; white-space: nowrap; cursor: default;
+}
+button.ml-chip { cursor: pointer; }
+button.ml-chip:hover { border-color: var(--dim); background: #ffffff08; }
+.ml-chip .ui-icon { width: 15px; height: 15px; flex-basis: 15px; color: var(--dim); }
+.ml-chip.warning { color: var(--yellow); border-color: color-mix(in srgb, var(--yellow) 60%, transparent); }
+.ml-chip--name span { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+/* a chip with a field: organisation and name of the login are typed right in the bar */
+.ml-chip--field { padding-right: 4px; cursor: text; }
+.ml-chip--field:focus-within { border-color: var(--dim); }
+.ml-chip--field input { width: 13ch; min-width: 0; height: 26px; padding: 0 2px; border: 0; outline: none; background: transparent; color: inherit; font: inherit; }
+.ml-chip--field input::placeholder { color: var(--dim); }
+.ml-login { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ml-login button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ═══ Smart selector ═══════════════════════════════════════════════════════
+   Drawing 2026-11-19-pda_ui_smart_selector: pictogram, value, edit, list, new
+   in one line, each of the three opening a popup below it. */
+.smart-selector {
+  display: inline-flex; align-items: center; gap: 2px; height: 36px; padding: 0 4px 0 8px; min-width: 0;
+  border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text);
+  font: 0.68rem 'JetBrains Mono', monospace; white-space: nowrap;
+}
+.smart-selector.open { border-color: var(--dim); }
+.smart-selector.warning { border-color: color-mix(in srgb, var(--yellow) 60%, transparent); }
+.smart-selector > .ui-icon { width: 15px; height: 15px; flex: 0 0 15px; margin-right: 3px; color: var(--dim); }
+.smart-selector-value { flex: 1 1 auto; min-width: 0; margin-right: 4px; overflow: hidden; }
+.smart-selector-value.empty { color: var(--dim); }
+.smart-selector.warning .smart-selector-value.empty, .smart-selector.warning > .ui-icon { color: var(--yellow); }
+.smart-selector-button {
+  flex: 0 0 22px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--dim); cursor: pointer;
+}
+.smart-selector-button .ui-icon { width: 15px; height: 15px; flex-basis: 15px; }
+.smart-selector-button:hover:not(:disabled), .smart-selector-button[aria-expanded="true"] { color: var(--text); background: #ffffff14; }
+.smart-selector-button:focus-visible { outline: 2px solid var(--accent-2); outline-offset: -1px; }
+.smart-selector-button:disabled { opacity: 0.4; cursor: not-allowed; }
+.smart-selector-popup {
+  position: fixed; z-index: 120; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #3d3d48 transparent;
+  background: var(--surface-solid); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 8px 24px #000a;
+  color: var(--text); font: 0.68rem 'JetBrains Mono', monospace;
+}
+/* the list: one row per object with thumbnail, pictogram or nothing, the full value, delete */
+.smart-selector-option { display: flex; align-items: center; gap: 10px; min-height: 51px; padding-right: 8px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.smart-selector-option:last-child { min-height: 50px; border-bottom: 0; }
+.smart-selector-option:hover, .smart-selector-option:focus-visible { background: #ffffff0f; outline: none; }
+.smart-selector-option.active { background: #ffffff1c; }
+/* 50 x 50 px; it stays empty while the object has no image */
+.smart-selector-thumbnail, .smart-selector-option-icon { flex: 0 0 51px; align-self: stretch; min-height: 50px; border-right: 1px solid var(--border); }
+.smart-selector-thumbnail img { display: block; width: 50px; height: 50px; object-fit: cover; }
+.smart-selector-option-icon { display: flex; align-items: center; justify-content: center; color: var(--dim); }
+.smart-selector-option-text { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 6px 0; }
+.smart-selector-option > .smart-selector-option-text:first-child { padding-left: 10px; }
+.smart-selector-option-value { white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
+.smart-selector-option-detail { color: var(--dim); font-size: 0.62rem; line-height: 1.3; }
+.smart-selector-option .cockpit-icon-button { width: 24px; height: 24px; }
+/* update and create: the fields of the object and one button */
+.smart-selector-form { display: grid; gap: 8px; padding: 10px; }
+.smart-selector-form input[type="text"] {
+  background: rgba(10,10,12,0.6); border: 1px solid var(--border); border-radius: 5px; color: var(--text);
+  font: 0.7rem 'JetBrains Mono', monospace; padding: 3px 6px; min-height: var(--cockpit-control); min-width: 0; outline: none;
+}
+.smart-selector-form input[type="text"]:focus-visible { border-color: var(--accent-2); }
+.smart-selector-number { display: flex; align-items: center; gap: 8px; }
+.smart-selector-number .cockpit-readout { flex: 0 0 5ch; }
+.smart-selector-number input { flex: 1 1 0; min-width: 0; accent-color: var(--accent-1); }
+.smart-selector-form .btn-small { justify-self: start; margin: 0; padding: 3px 12px; min-height: var(--cockpit-control); font-size: 0.66rem; }
+.smart-selector-form .btn-small:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 1px; }
+
+/* ═══ ML Training: the image with its boxes ════════════════════════════════
+   Exactly where the live image is. Over the live image the stage is
+   transparent; a still image covers the live image. */
+.ml-stage {
+  position: fixed; top: var(--topbar-h); left: 0; z-index: 25;
+  width: calc(100vw - var(--ml-dock-w)); height: calc(100dvh - var(--topbar-h));
+  overflow: hidden; user-select: none; touch-action: none;
+}
+.ml-stage:not(.ml-stage--live) { background: #000; }
+.ml-still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+/* the image itself inside the stage: everything on it is placed in parts of its size */
+.ml-view { position: absolute; cursor: crosshair; }
+.ml-view--move { cursor: move; }
+.ml-view--nwse { cursor: nwse-resize; }
+.ml-view--nesw { cursor: nesw-resize; }
+.ml-view--label { cursor: default; }
+.ml-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.ml-svg :is(rect, line) { vector-effect: non-scaling-stroke; }
+/* a box is an outline: the object inside stays visible */
+.ml-bbox { fill: color-mix(in srgb, currentColor 4%, transparent); stroke: currentColor; stroke-width: 2px; }
+.ml-bbox.edit { fill: color-mix(in srgb, currentColor 12%, transparent); stroke-width: 3px; }
+.ml-bbox-draft { fill: color-mix(in srgb, currentColor 10%, transparent); stroke: currentColor; stroke-width: 2px; stroke-dasharray: 4 3; }
+.ml-crosshair line { stroke: currentColor; stroke-width: 1px; stroke-dasharray: 7 5; }
+/* the edges of the box in edit mode run on across the whole stage */
+.ml-guide line { stroke: currentColor; stroke-width: 1px; stroke-dasharray: 7 5; }
+.ml-prediction rect { fill: none; stroke: currentColor; stroke-width: 2px; stroke-dasharray: 7 5; }
+.ml-svg text { font-family: 'JetBrains Mono', monospace; font-weight: 700; fill: currentColor; stroke: #000; paint-order: stroke; stroke-linejoin: round; }
+.ml-handle { fill: #fff; stroke: #000; stroke-width: 1px; }
+/* inside a box, at its top left corner: key and name of its class, and delete.
+   a click on the name puts the box into edit mode.
+   the image under it is what gets annotated: at rest the tag is see-through
+   writing without a ground. under the pointer and in edit mode it is solid. */
+.ml-bbox-tag { position: absolute; display: flex; margin: 3px 0 0 3px; white-space: nowrap; color: var(--ml-color); opacity: 0.5; filter: drop-shadow(0 0 1px #000); }
+.ml-bbox-tag:is(:hover, :has(:focus-visible), .edit) { opacity: 1; filter: none; }
+.ml-bbox-label, .ml-bbox-delete {
+  display: inline-flex; align-items: center; justify-content: center; height: 20px; padding: 0;
+  border: 1px solid transparent; background: transparent; color: var(--ml-color);
+  font: 700 0.66rem 'JetBrains Mono', monospace; cursor: pointer;
+}
+.ml-bbox-tag:is(:hover, :has(:focus-visible), .edit) :is(.ml-bbox-label, .ml-bbox-delete) { border-color: var(--ml-color); background: #000c; }
+.ml-bbox-label { gap: 4px; padding: 0 6px 0 3px; border-radius: 4px 0 0 4px; }
+.ml-bbox-delete { width: 20px; border-left: 0; border-radius: 0 4px 4px 0; }
+.ml-bbox-delete .ui-icon { width: 13px; height: 13px; flex-basis: 13px; }
+.ml-bbox-tag :is(.ml-bbox-label, .ml-bbox-delete):is(:hover, :focus-visible), .ml-bbox-tag.edit .ml-bbox-label { background: var(--ml-color); color: #000; outline: none; }
+.ml-bbox-label .ml-class-key, .ml-cursor-label .ml-class-key { flex: 0 0 14px; width: 14px; height: 14px; border-color: currentColor; color: inherit; font-size: 0.54rem; }
+/* next to the cursor: the class the next box will get */
+.ml-cursor-label {
+  position: absolute; display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px 0 3px;
+  border-radius: 4px; background: #000c; font: 700 0.66rem 'JetBrains Mono', monospace; white-space: nowrap; pointer-events: none;
+}
+/* while boxes are drawn on the live image the mouse does not jog the stage */
+body.ml-annotating .mouse-jog-overlay { visibility: hidden; }
+
+/* the question before the field of view is left */
+.ml-ask-backdrop { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; background: #0008; }
+.ml-ask {
+  width: 380px; max-width: calc(100vw - 32px); padding: 16px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-solid); box-shadow: 0 12px 40px #000c; color: var(--text);
+}
+.ml-ask p { font-size: 0.84rem; line-height: 1.45; }
+.ml-ask-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.ml-ask .btn-small { margin: 0; padding: 5px 14px; }
+.ml-ask .btn-small:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 1px; }
+.ml-ask .btn-small.danger:hover { color: var(--danger); border-color: var(--danger); }
+
+/* a capture with several focus points is running: in the middle of the image,
+   over everything that lies on it. the image stays visible behind it. */
+.ml-progress-backdrop {
+  position: fixed; top: var(--topbar-h); left: 0; z-index: 80;
+  width: calc(100vw - var(--ml-dock-w)); height: calc(100dvh - var(--topbar-h));
+  display: flex; align-items: center; justify-content: center; background: #0004;
+}
+.ml-progress {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px 12px 16px;
+  border: 1px solid var(--accent-1); border-radius: 8px; background: var(--surface-solid);
+  box-shadow: 0 12px 40px #000c; color: var(--text); font: 700 0.8rem 'JetBrains Mono', monospace; white-space: nowrap;
+}
+.ml-progress-spinner {
+  flex: 0 0 22px; width: 22px; height: 22px; border: 3px solid #ffffff2e; border-top-color: var(--accent-1); border-radius: 50%;
+  animation: ml-progress-spin 0.9s linear infinite;
+}
+@keyframes ml-progress-spin { to { transform: rotate(360deg); } }
+/* the longest text is "capturing focus point 1/9": the button does not jump when the text changes */
+.ml-progress-text { min-width: 25ch; }
+.ml-progress .btn-small { margin: 0; padding: 5px 14px; }
+.ml-progress .btn-small:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 1px; }
+
+/* all images of the dataset */
+.ml-library { top: calc(var(--topbar-h) + 12px); right: calc(var(--ml-dock-w) + 12px); width: 548px; }
+.ml-library-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; max-height: calc(100dvh - var(--topbar-h) - 100px); }
+.ml-library-item { position: relative; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: #000; aspect-ratio: 4 / 3; }
+.ml-library-item.active { border-color: var(--accent-1); }
+.ml-library-open { width: 100%; height: 100%; padding: 0; border: 0; background: transparent; color: var(--dim); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.ml-library-open img { width: 100%; height: 100%; object-fit: contain; }
+.ml-library-count, .ml-library-done { position: absolute; top: 3px; display: inline-flex; align-items: center; justify-content: center; height: 18px; border-radius: 9px; background: #000c; pointer-events: none; }
+.ml-library-count { left: 3px; min-width: 18px; padding: 0 5px; font: 700 0.6rem 'JetBrains Mono', monospace; color: var(--text); }
+.ml-library-done { left: 28px; width: 18px; color: var(--accent-1); }
+.ml-library-done .ui-icon { width: 12px; height: 12px; flex-basis: 12px; }
+.ml-library-delete { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; background: #000c; opacity: 0; }
+.ml-library-item:hover .ml-library-delete, .ml-library-delete:focus-visible { opacity: 1; }

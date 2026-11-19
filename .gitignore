@@ -13,3 +13,7 @@ __pycache__/
 training_data/
 
 venv_yolo/
+
+# data server: database, images, models and protocol
+dataserver/data/
+dataserver/log/

@@ -31,6 +31,7 @@ let o_component__toolbar = {
                     <button v-for="item in a_o_activity" :key="item.s_panel" class="toolbar-toggle toolbar-icon running"
                         @click="f_toggle_panel(item.s_panel)" :aria-label="item.s_label" :title="item.s_label" :data-tooltip="item.s_label"><ui_icon :s_name="item.s_icon" /></button>
                 </div>
+                <div class="toolbar-group toolbar-group--motor" id="toolbar-motor"></div>
                 <div class="toolbar-group toolbar-group--camera">
                     <o_component__manual_speed s_context="quick" :b_compact="true" />
                     <label class="toolbar-select" :data-tooltip="'USB camera · ' + s_camera_label" :title="'USB camera · ' + s_camera_label">
@@ -40,10 +41,8 @@ let o_component__toolbar = {
                             <option v-for="o_dev in o_state.a_o_device__webcam" :key="o_dev.deviceId" :value="o_dev.deviceId">{{ o_dev.label || o_dev.deviceId }}</option>
                         </select>
                     </label>
-                    <button class="toolbar-toggle toolbar-icon" :class="{ active: o_state.o_panel_visibility.led_setting }"
-                        @click="f_toggle_panel('led_setting')" aria-label="LED settings" :aria-pressed="!!o_state.o_panel_visibility.led_setting"
-                        title="LED · red, green, blue and warm/cold white" data-tooltip="LED · red, green, blue and warm/cold white"><ui_icon s_name="led" /></button>
                 </div>
+                <div class="toolbar-group toolbar-group--ml" id="toolbar-ml"></div>
                 <div class="toolbar-group toolbar-group--utilities">
                     <button class="toolbar-toggle toolbar-icon toolbar-stop" :class="{ active: b_any_motor_running }"
                         @click="f_stop_all" aria-label="Stop all motors" title="Stop all motors · Esc" data-tooltip="Stop all motors · Esc"><ui_icon s_name="stop" /></button>
@@ -166,6 +165,7 @@ let o_component__toolbar = {
                 ] },
                 { s_label: 'Analysis', a_o_tool: [
                     { s_panel: 'motion_detection', s_icon: 'detection', s_label: 'Motion detection', s_title: 'Detect changes in the camera image' },
+                    { s_panel: 'ml_training', s_icon: 'ml', s_label: 'ML Training', s_title: 'Annotate images, export a dataset, train and apply a detection model' },
                 ] },
                 { s_label: 'Movement', a_o_tool: [
                     { s_panel: 'focus', s_icon: 'focus', s_label: 'Focus', s_title: 'Sharpness meter and autofocus' },

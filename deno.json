@@ -5,6 +5,9 @@
         "doctor": "deno run -A install.js --check",
         "verify": "deno run -A install.js --verify-compile",
         "server": "deno run -A webserver_denojs.js",
-        "flash": "deno run -A startup.js"
+        "flash": "deno run -A startup.js",
+        "dataserver": "deno run --allow-net=127.0.0.1:8001 --allow-read=dataserver,venv_yolo --allow-write=dataserver/data,dataserver/log --allow-run=venv_yolo/bin/python3 --allow-sys=statfs --allow-env=DATASERVER_* dataserver/dataserver_denojs.js",
+        "install_yolo": "deno run -A dataserver/install_yolo.js",
+        "test_dataserver": "deno test -A dataserver/test tests/ml_bbox_test.js tests/smart_selector_test.js tests/view_hold_test.js tests/ml_training_browser_test.js"
     }
 }
