@@ -30,6 +30,8 @@ installed on first run (skipped afterwards, so `deno task start` stays fast):
 - `./venv` with `numpy` + `opencv-python` — used by `stitch.py` (the tile scan mosaic)
 - `torch` (cpu build) + `lightglue` + `kornia` — used by `autostitch.py` and by `stitch.py --matcher loftr`
 - linux only: `v4l2-ctl` (system package `v4l-utils`, installed with `sudo`, which may ask for your password) — gives the Camera window the real sensor sizes of the camera and the controls the browser cannot reach (ISO). on other systems the Camera window works without them
+- linux only: the entry `MicroMatic` in the application menu (`~/.local/share/applications/micromatic.desktop`) and the same entry as an icon on the desktop — press the Super key and type `MicroMatic`, or open the icon: a terminal window starts the application and the data server and opens the browser. started again while they are running, it restarts them; closing the window stops both. `deno task launch` does the same from a terminal. `deno task install --skip-desktop` leaves menu and desktop alone; deleting the two files removes the entry
+- linux only: a check of the browser. Chromium from the Snap store (Ubuntu) sees no USB devices, so the ESP32 is missing in its list; the installer says so and how to change it (`sudo snap connect chromium:raw-usb`, or Google Chrome)
 
 the installer also runs `stitch.py --help` inside the venv, so a broken numpy/opencv
 install is reported before a scan is started rather than after it.

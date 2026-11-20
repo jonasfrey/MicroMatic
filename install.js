@@ -7,6 +7,9 @@
 //   torch (cpu) + lightglue + kornia              ->  autostitch.py feature matching,
 //                                                     stitch.py --matcher loftr
 //   v4l2-ctl (linux only)                         ->  camera sensor sizes + gain in the Camera window
+//   desktop entry (linux only)                    ->  "MicroMatic" in the application menu and as an icon on
+//                                                     the desktop starts or restarts the application and the
+//                                                     data server
 //
 // every step is idempotent: already satisfied steps are skipped, so this is safe
 // to run on every `deno task start`.
@@ -16,6 +19,7 @@ import {
     s_ds,
 } from "./runtimedata.module.js";
 import { f_generate_ino } from './flash_functions.module.js';
+import { f_s_path__desktop_entry, f_s_path__desktop_icon, f_s_desktop_entry, f_b_chromium_snap__usb, A_S_NAME__BROWSER } from './launcher/launcher.module.js';
 
 // ─── Paths ──────────────────────────────────────────────────────────
 
@@ -43,6 +47,7 @@ let b_skip_arduino = a_s_arg.includes('--skip-arduino');
 let b_skip_python = a_s_arg.includes('--skip-python');
 let b_skip_stitch_ai = a_s_arg.includes('--skip-stitch-ai');
 let b_verify_compile = a_s_arg.includes('--verify-compile');
+let b_skip_desktop = a_s_arg.includes('--skip-desktop');
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -438,6 +443,112 @@ let f_check_serial = async function() {
     }
 };
 
+// ─── Step: browser (linux) ──────────────────────────────────────────
+// the application reaches the ESP32 from the browser (Web Serial). Chromium from the Snap
+// store (Ubuntu) is kept away from USB devices: its list of devices stays empty.
+
+let f_b_program = async function(s_name) {
+    return (await f_o_run('which', [s_name])).b_success;
+};
+
+let f_check_browser = async function() {
+    if (Deno.build.os !== 'linux') return;
+    f_log_step('browser for the USB connection');
+    // the launcher takes the first of these that is installed
+    let s_name__browser = '';
+    for (let s_name of A_S_NAME__BROWSER) {
+        if (s_name !== 'xdg-open' && await f_b_program(s_name)) { s_name__browser = s_name; break; }
+    }
+    if (s_name__browser === '') {
+        f_log_todo('no Chrome, Chromium or Edge found — the USB connection to the ESP32 needs one of them');
+        return;
+    }
+    // on Ubuntu "chromium" is a link into /snap/bin, and "chromium-browser" a script that starts the snap
+    let s_path__browser = (await f_o_run('which', [s_name__browser])).s_stdout.trim();
+    let b_snap = s_path__browser.startsWith('/snap/');
+    if (!b_snap && s_name__browser.startsWith('chromium')) {
+        try { b_snap = (await Deno.lstat('/snap/bin/chromium')) !== null; } catch { /* no Chromium from the Snap store */ }
+    }
+    if (!b_snap) {
+        f_log_ok(`${s_name__browser} can reach USB devices`);
+        return;
+    }
+    let o_connection = await f_o_run('snap', ['connections', 'chromium']);
+    if (o_connection.b_success && f_b_chromium_snap__usb(o_connection.s_stdout)) {
+        f_log_ok(`${s_name__browser} (snap) may reach USB devices`);
+        return;
+    }
+    f_log_todo(`${s_name__browser} comes from the Snap store and sees no USB devices: the ESP32 will be missing in its list`);
+    f_log('fix:  sudo snap connect chromium:raw-usb   (then start Chromium again), or install Google Chrome');
+};
+
+// ─── Step: desktop entry (linux) ────────────────────────────────────
+// "MicroMatic" in the application menu and as an icon on the desktop:
+// launcher/launcher_denojs.js in a terminal window. written again whenever
+// the checkout or deno has moved.
+
+// s_place: where the entry shows, for the messages. b_icon: a file on the desktop,
+// which the desktop only starts when it can be executed and is marked as trusted.
+let f_write_desktop_entry = async function(s_path__entry, s_entry, s_place, b_icon) {
+    let s_entry__now = '';
+    let b_executable = false;
+    try {
+        s_entry__now = await Deno.readTextFile(s_path__entry);
+        b_executable = ((await Deno.stat(s_path__entry)).mode & 0o111) !== 0;
+    } catch { /* not there yet */ }
+    if (s_entry__now === s_entry && (b_executable || !b_icon)) {
+        f_log_ok(`"MicroMatic" is ${s_place}`);
+        return;
+    }
+    if (b_check_only) {
+        f_log_todo(s_entry__now === '' ? `"MicroMatic" is not ${s_place} yet` : `the entry "MicroMatic" ${s_place} points to another place`);
+        a_s_problem.push('desktop entry');
+        return;
+    }
+    try {
+        await Deno.mkdir(s_path__entry.replace(/\/[^/]*$/, ''), { recursive: true });
+        await Deno.writeTextFile(s_path__entry, s_entry);
+        if (b_icon) {
+            await Deno.chmod(s_path__entry, 0o755);
+            // GNOME (Ubuntu) shows "Allow Launching" until the file is marked. other desktops ignore the mark.
+            await f_o_run('gio', ['set', s_path__entry, 'metadata::trusted', 'true']);
+        }
+        f_log_ok(`"MicroMatic" is ${s_place} now (${s_path__entry})`);
+    } catch (o_error) {
+        f_log_error(`could not write ${s_path__entry}: ${o_error.message}`);
+        a_s_problem.push('desktop entry');
+    }
+};
+
+let f_setup_desktop = async function() {
+    f_log_step('Desktop entry');
+    if (Deno.build.os !== 'linux') {
+        f_log('only on linux, skipped');
+        return;
+    }
+    let s_path__home = Deno.env.get('HOME');
+    let s_entry = f_s_desktop_entry({
+        s_path__deno: Deno.execPath(),
+        s_path__launcher: `${s_root_dir}${s_ds}launcher${s_ds}launcher_denojs.js`,
+        s_path__root: s_root_dir,
+        s_path__icon: `${s_root_dir}${s_ds}launcher${s_ds}icon_lux.svg`,
+    });
+    await f_write_desktop_entry(f_s_path__desktop_entry(Deno.env.get('XDG_DATA_HOME'), s_path__home), s_entry, 'in the application menu', false);
+
+    // the icon on the desktop, where the user has a desktop folder
+    let o_folder = await f_o_run('xdg-user-dir', ['DESKTOP']);
+    let s_path__icon = f_s_path__desktop_icon(o_folder.b_success ? o_folder.s_stdout : '', s_path__home);
+    let b_folder = false;
+    try {
+        b_folder = s_path__icon !== '' && (await Deno.stat(s_path__icon.replace(/\/[^/]*$/, ''))).isDirectory;
+    } catch { /* no desktop folder */ }
+    if (!b_folder) {
+        f_log('no desktop folder, so no icon on the desktop');
+        return;
+    }
+    await f_write_desktop_entry(s_path__icon, s_entry, 'on the desktop', true);
+};
+
 // ─── Run ────────────────────────────────────────────────────────────
 
 console.log(`
@@ -450,6 +561,8 @@ if (!b_skip_python) await f_setup_python();
 if (!b_skip_arduino) await f_setup_arduino();
 await f_setup_v4l2();
 await f_check_serial();
+await f_check_browser();
+if (!b_skip_desktop) await f_setup_desktop();
 
 if (a_s_problem.length === 0) {
     console.log('\n  ✓ everything is ready\n');
