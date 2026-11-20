@@ -72,6 +72,9 @@ const o_path = {
     pause: 'M7 4v16 M17 4v16',
     trash: 'M3 3.5h18v3H3z M5 6.5l1.5 14h11L19 6.5 M9 10v7 M12 10v7 M15 10v7',
     download: 'M12 3v12 M7 10l5 5 5-5 M4 20h16',
+    // after 04_Entwicklung/Konzept/UI/svg/capture_image_mgc.svg of the diploma thesis: a picture with an arrow down.
+    // the camera pictogram stands for the camera itself, not for taking an image.
+    capture_image: 'M12 19H3V5h16v6 M3 16l5-5 5 5 M15.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0 M19 14v8 M15.5 18.5L19 22l3.5-3.5',
     plus: 'M12 5v14 M5 12h14',
     minus: 'M5 12h14',
     undo: 'M8 7l-4 4 4 4 M4 11h10a5 5 0 0 1 0 10h-3',

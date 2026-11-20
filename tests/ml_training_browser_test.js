@@ -417,8 +417,21 @@ Deno.test('ML Training window: from login to a trained model', async () => {
         assert.deepEqual(await f_v_page(`return [...document.querySelectorAll('.smart-selector-option')].map(el => el.querySelector('.smart-selector-option-detail')?.textContent.trim() ?? null);`), ['number 0.5', null]);
         await f_v_page(`await o_test.f_choose('value 1');`);
         assert.equal(await f_s_demo(), 'value 1');
+        // every popup says in its title line what it is for, and has a button that closes it
+        let f_a_v_title = () => f_v_page(`let el = o_test.f_el('.smart-selector-popup .smart-selector-title');
+            let o_title = el?.getBoundingClientRect(); let o_popup = o_test.f_el('.smart-selector-popup')?.getBoundingClientRect();
+            return el ? [el.querySelector('span').textContent, !!el.querySelector('svg'), [o_title.top - o_popup.top, o_title.left - o_popup.left, o_popup.right - o_title.right]] : null;`);
+        await f_v_page(`await o_test.f_click('Thing list');`);
+        assert.deepEqual(await f_a_v_title(), ['Thing list', true, [1, 1, 1]]);
+        await f_v_page(`await o_test.f_click('Close');`);
+        assert.deepEqual(await f_v_page(`return [!!o_test.f_el('.smart-selector-popup'), document.activeElement === o_test.f_el_button('Thing list')];`), [false, true]);
+        await f_v_page(`await o_test.f_click('New thing');`);
+        assert.deepEqual(await f_a_v_title(), ['New thing', true, [1, 1, 1]]);
+        await f_v_page(`await o_test.f_click('Close');`);
+        assert.deepEqual(await f_v_page(`return [!!o_test.f_el('.smart-selector-popup'), o_test.o_demo.a_o_object.length, document.activeElement === o_test.f_el_button('New thing')];`), [false, 2, true]);
         // edit: the fields hold what the object holds; "update" changes it
         await f_v_page(`await o_test.f_click('Edit thing');`);
+        assert.deepEqual(await f_a_v_title(), ['Edit thing', true, [1, 1, 1]]);
         assert.deepEqual(await f_v_page(`let el = o_test.f_el('.smart-selector-form');
             return [el.querySelector('input[type="text"]').value, el.querySelector('input[type="range"]').value, el.querySelector('.cockpit-readout').textContent, document.activeElement === el.querySelector('input[type="text"]')];`),
             ['value 1', '0.1', '0.1', true]);
@@ -491,6 +504,30 @@ Deno.test('ML Training window: from login to a trained model', async () => {
         await f_v_page(`await o_test.f_type('[aria-label="New class name"]', 'CERATIUM', 'Enter'); await o_test.f_wait(() => o_test.o_ml.s_error.includes('exists already'), 'name refused');
             o_test.o_state.a_o_toast.length = 0; await o_test.f_type('[aria-label="New class name"]', '');`);
         assert.equal(await f_v_page(`return o_test.o_ml.a_o_class.length;`), 2);
+        // leaving the field creates the class as well: a typed name is not lost without Enter
+        let f_leave_class_field = s_name => f_v_page(`let el = o_test.f_el('[aria-label="New class name"]'); el.focus(); el.value = ${JSON.stringify(s_name)};
+            el.dispatchEvent(new Event('input', { bubbles: true })); await o_test.f_tick(); el.dispatchEvent(new FocusEvent('blur')); await o_test.f_tick();`);
+        await f_leave_class_field('rotifer');
+        await f_v_page(`await o_test.f_wait(() => o_test.o_ml.a_o_class.length === 3 && o_test.o_ml.s_activity === '', 'class created by leaving the field');`);
+        assert.deepEqual(await f_a_s_class(), ['1 ceratium', '2 Luftblase', '3 rotifer']);
+        assert.deepEqual(await f_v_page(`return [o_test.f_el('[aria-label="New class name"]').value, o_test.o_ml.a_o_class.find(o => o.n_id === o_test.o_ml.n_id__class__active).s_name];`), ['', 'rotifer']);
+        assert.deepEqual((await f_o_request(o_server, 'GET', '/api/dataset/1', { s_token: await f_v_page(`return localStorage.getItem('omm.dataserver.s_token');`) })).v_body.a_o_class.map(o => o.s_name),
+            ['ceratium', 'Luftblase', 'rotifer']);
+        // a refused name stays in the field and is said once: leaving the field again does not ask for it again
+        await f_leave_class_field('Rotifer');
+        await f_v_page(`await o_test.f_wait(() => o_test.o_ml.s_error.includes('exists already') && o_test.o_ml.s_activity === '', 'name refused on leaving');`);
+        let n_cnt__toast = await f_v_page(`return o_test.o_state.a_o_toast.length;`);
+        await f_v_page(`let el = o_test.f_el('[aria-label="New class name"]'); el.dispatchEvent(new FocusEvent('blur')); await o_test.f_tick(); await o_test.f_tick();`);
+        assert.deepEqual(await f_v_page(`return [o_test.f_el('[aria-label="New class name"]').value, o_test.o_state.a_o_toast.length, o_test.o_ml.a_o_class.length];`), ['Rotifer', n_cnt__toast, 3]);
+        await f_v_page(`o_test.o_state.a_o_toast.length = 0; await o_test.f_type('[aria-label="New class name"]', '');`);
+        // a class is deleted only after a question, also one that no box uses; "no" keeps it
+        await f_v_page(`o_test.a_s_dialog.length = 0; window.confirm = s_message => { o_test.a_s_dialog.push(s_message); return false; };
+            await o_test.f_click('Delete class rotifer'); await o_test.f_tick();`);
+        assert.deepEqual(await f_v_page(`return [o_test.a_s_dialog, o_test.o_ml.a_o_class.length, o_test.o_ml.s_activity];`), [['Delete the class "rotifer"?'], 3, '']);
+        await f_v_page(`o_test.a_s_dialog.length = 0; window.confirm = s_message => { o_test.a_s_dialog.push(s_message); return true; };
+            await o_test.f_click('Delete class rotifer'); await o_test.f_wait(() => o_test.o_ml.a_o_class.length === 2 && o_test.o_ml.s_activity === '', 'unused class deleted');`);
+        assert.deepEqual(await f_v_page(`return o_test.a_s_dialog;`), ['Delete the class "rotifer"?']);
+        assert.deepEqual(await f_a_s_class(), ['1 ceratium', '2 Luftblase']);
         // key 1 makes the first class the active one
         await f_v_page(`await o_test.f_key('1');`);
         assert.equal(await f_v_page(`return document.querySelector('.ml-class.active .ml-class-name').value;`), 'ceratium');
@@ -516,13 +553,17 @@ Deno.test('ML Training window: from login to a trained model', async () => {
         // dragging is no click: the active class stays
         assert.equal(await f_v_page(`return document.querySelector('.ml-class.active .ml-class-name').value;`), 'ceratium');
 
-        // ── capture is blocked until slide, microscope, objective and calibration are known ──
+        // ── capture is blocked until slide, microscope and objective are known ──
         assert.equal(await f_v_page(`return o_test.f_el_button('capture').disabled;`), true);
         let s_tooltip = await f_v_page(`return o_test.f_el_button('capture').dataset.tooltip;`);
-        for(let s_reason of ['Select a camera', 'Name the slide', 'Enter the microscope', 'Enter the objective', 'Calibrate µm per px', 'Calibrate steps per px']){
+        for(let s_reason of ['Select a camera', 'Name the slide', 'Enter the microscope', 'Enter the objective']){
             assert.ok(s_tooltip.includes(s_reason), 'tooltip names: ' + s_reason);
         }
+        // µm per px and px per step are nice to have, not needed: no reason against a capture, and nothing to act on in the top bar
+        assert.doesNotMatch(s_tooltip, /calibrat/i);
         assert.equal(await f_v_page(`return o_test.f_s_bar();`), '— µm/px | — · — px/step | {no slide} | privat1 | jonas');
+        assert.deepEqual(await f_v_page(`return ['µm per px', 'px per step'].map(s => { let el = o_test.f_el_button(s); return [el.classList.contains('empty'), el.classList.contains('warning'), el.dataset.tooltip.includes('Images are stored without it')]; });`),
+            [[true, false, true], [true, false, true]]);
         // without a camera there is no image to draw on
         assert.equal(await f_v_page(`return !!o_test.f_el('.ml-stage');`), false);
         await f_screenshot('1-blocked');
@@ -593,6 +634,7 @@ Deno.test('ML Training window: from login to a trained model', async () => {
             o_test.o_state.a_n_step__per_px = [0.4, 0.5, 0];
             await o_test.f_type('#ml-microscope', 'Bresser Erudit'); await o_test.f_type('#ml-calibration', '10x');`);
         assert.equal(await f_v_page(`return o_test.f_s_bar();`), '0.52 µm/px | 2.5 · 2 px/step | {ceratium1} | privat1 | jonas');
+        assert.deepEqual(await f_v_page(`return ['µm per px', 'px per step'].map(s => o_test.f_el_button(s).classList.contains('empty'));`), [false, false]);
 
         // ── µm per px belongs to the camera image it was measured on ──
         // after a reload the camera has started but its image has no size yet: the stored scale is used all the same
@@ -602,11 +644,11 @@ Deno.test('ML Training window: from login to a trained model', async () => {
         await f_v_page(`await o_test.f_show_camera(640, 480);`);
         assert.equal(await f_v_page(`return o_test.f_s_bar();`), '0.52 µm/px | 2.5 · 2 px/step | {ceratium1} | privat1 | jonas');
         assert.equal(await f_v_page(`return o_test.f_el_button('capture').disabled;`), false);
-        // an image of another size: the scale is not used, and capture says why
+        // an image of another size: the scale is not used. an image can be taken all the same, it is stored without the scale.
         await f_v_page(`await o_test.f_show_camera(320, 240);`);
         assert.equal(await f_v_page(`return o_test.f_s_bar();`), '— µm/px | 2.5 · 2 px/step | {ceratium1} | privat1 | jonas');
-        assert.equal(await f_v_page(`return o_test.f_el_button('capture').disabled;`), true);
-        assert.ok((await f_v_page(`return o_test.f_el_button('capture').dataset.tooltip;`)).includes('Calibrate µm per px for this camera image'));
+        assert.equal(await f_v_page(`return o_test.f_el_button('capture').disabled;`), false);
+        assert.doesNotMatch(await f_v_page(`return o_test.f_el_button('capture').dataset.tooltip;`), /calibrat/i);
         // the calibrated size again
         await f_v_page(`await o_test.f_show_camera(640, 480);`);
         assert.equal(await f_v_page(`return o_test.f_s_bar();`), '0.52 µm/px | 2.5 · 2 px/step | {ceratium1} | privat1 | jonas');
@@ -1034,8 +1076,33 @@ Deno.test('ML Training window: from login to a trained model', async () => {
 
         // ── a class with boxes is deleted only after the question ──
         await f_v_page(`o_test.a_s_dialog.length = 0; await o_test.f_click('Delete class Luftblase'); await o_test.f_wait(() => o_test.o_ml.a_o_class.length === 1, 'class deleted');`);
-        assert.match(await f_v_page(`return o_test.a_s_dialog[0];`), /used by 1 boxes/);
+        assert.deepEqual(await f_v_page(`return o_test.a_s_dialog;`), ['The class "Luftblase" is used by 1 box. Delete the class and this box?']);
         assert.equal((await f_a_o_image())[0].a_o_bbox.length, 0);
+
+        // ── µm per px and px per step are not measured: the image is stored all the same, without them ──
+        await f_v_page(`o_test.o_state.o_calibration.n_um__per_px = 0; o_test.o_state.a_n_step__per_px = [0, 0, 0]; await o_test.f_tick();`);
+        assert.deepEqual(await f_v_page(`return [o_test.f_s_bar(), o_test.f_el_button('capture').disabled, !!o_test.o_ml.o_image];`),
+            ['— µm/px | — · — px/step | {ceratium1b} | privat1 | jonas', false, false]);
+        await f_v_page(`await o_test.f_click('capture'); await o_test.f_wait(() => o_test.o_ml.a_o_image.length === 6 && o_test.o_ml.s_activity === '', 'image stored without calibration');`);
+        assert.equal(await f_v_page(`return o_test.o_ml.s_error;`), '');
+        let o_image__unmeasured = (await f_a_o_image()).at(-1);
+        let a_o_calibration = (await f_o_request(o_server, 'GET', '/api/microscope', { s_token })).v_body.a_o_microscope.flatMap(o => o.a_o_calibration);
+        let o_calibration__unmeasured = a_o_calibration.find(o => o.n_id === o_image__unmeasured.n_o_calibration_n_id);
+        // the objective is still named. what is not measured is empty, not 0.
+        assert.deepEqual([o_calibration__unmeasured.s_name, o_calibration__unmeasured.n_px_per_step_x, o_calibration__unmeasured.n_px_per_step_y, o_calibration__unmeasured.n_um_per_px], ['10x', null, null, null]);
+        // one of the two measured: the other one stays empty
+        await f_v_page(`o_test.o_state.o_calibration.n_um__per_px = 0.52; await o_test.f_tick();
+            await o_test.f_click('capture'); await o_test.f_wait(() => o_test.o_ml.a_o_image.length === 7 && o_test.o_ml.s_activity === '', 'image stored with one value');`);
+        let o_image__half = (await f_a_o_image()).at(-1);
+        let o_calibration__half = (await f_o_request(o_server, 'GET', '/api/microscope', { s_token })).v_body.a_o_microscope.flatMap(o => o.a_o_calibration).find(o => o.n_id === o_image__half.n_o_calibration_n_id);
+        assert.deepEqual([o_calibration__half.s_name, o_calibration__half.n_px_per_step_x, o_calibration__half.n_px_per_step_y, o_calibration__half.n_um_per_px], ['10x', null, null, 0.52]);
+        assert.notEqual(o_calibration__half.n_id, o_calibration__unmeasured.n_id);
+        // the two images go again, so that what follows finds the dataset as before
+        await f_v_page(`await o_test.f_click('Images'); await o_test.f_wait(() => o_test.f_el('.ml-library'), 'library');
+            await o_test.f_click('Delete image ${o_image__unmeasured.n_id}'); await o_test.f_wait(() => o_test.o_ml.a_o_image.length === 6, 'image deleted');
+            await o_test.f_click('Delete image ${o_image__half.n_id}'); await o_test.f_wait(() => o_test.o_ml.a_o_image.length === 5 && o_test.o_ml.s_activity === '', 'image deleted');
+            await o_test.f_click('Close images');`);
+        await f_v_page(`o_test.o_state.o_calibration.n_um__per_px = 0.52; o_test.o_state.a_n_step__per_px = [0.4, 0.5, 0]; await o_test.f_tick();`);
 
         // ── a second dataset: the list shows the image captured last, chooses, and deletes after the name is typed ──
         await f_v_page(`await o_test.f_create('dataset', 'Diatomeen'); await o_test.f_wait(() => o_test.o_ml.a_o_dataset.length === 2 && o_test.o_state.o_ml_config.n_id__dataset === 2 && o_test.o_ml.s_activity === '', 'second dataset');`);

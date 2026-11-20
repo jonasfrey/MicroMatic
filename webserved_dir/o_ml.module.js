@@ -197,9 +197,9 @@ let f_o_metadata__now = function(){
 };
 
 // why an image cannot be taken right now; empty when it can
+// µm per px and px per step are no reason: an image is stored without the values that are not measured
 let f_a_s_reason__capture = function(){
     let a_s_reason = [];
-    let o_calibration = f_o_calibration__local();
     if(o_ml.o_image) a_s_reason.push('A stored image is shown. Go back to the live image first.');
     if(!o_ml.o_person) a_s_reason.push('Log in first.');
     if(!f_o_dataset__current()) a_s_reason.push('Select or create a dataset.');
@@ -207,8 +207,6 @@ let f_a_s_reason__capture = function(){
     if(f_s_name__slide() === '') a_s_reason.push('Name the slide on the stage (top bar).');
     if(o_state.o_ml_config.s_name__microscope.trim() === '') a_s_reason.push('Enter the microscope.');
     if(o_state.o_ml_config.s_name__calibration.trim() === '') a_s_reason.push('Enter the objective.');
-    if(!(o_calibration.n_um_per_px > 0)) a_s_reason.push('Calibrate µm per px for this camera image (Size window).');
-    if(!(o_calibration.n_px_per_step_x > 0 && o_calibration.n_px_per_step_y > 0)) a_s_reason.push('Calibrate steps per px for X and Y (Setup window).');
     if(o_ml.n_byte__free !== null && o_ml.n_byte__free < N_BYTE__FREE_MIN) a_s_reason.push('The disk of the data server is full.');
     if(o_ml.n_cnt__focus > 1){
         if(f_n_step__focus() === null) a_s_reason.push('Focus points need the Z motor. Connect the microcontroller.');
@@ -509,6 +507,14 @@ let f_create_class = async function(s_name){
     });
 };
 
+// the boxes of a class as far as they are known here: on the stored images and on the camera image
+let f_n_cnt__bbox__of_class = function(o_class){
+    let f_b_of_class = function(o_bbox){ return o_bbox.n_o_class_n_id === o_class.n_id; };
+    let n_cnt = f_a_o_bbox__camera().filter(f_b_of_class).length;
+    for(let o_image of o_ml.a_o_image) n_cnt += (o_image.a_o_bbox || []).filter(f_b_of_class).length;
+    return n_cnt;
+};
+
 // o_change: { s_name } or { s_color_hex }
 let f_update_class = async function(o_class, o_change){
     let o_dataset = f_o_dataset__current();
@@ -768,8 +774,11 @@ let f_o_origin__ensured = async function(){
     let o_calibration__local = f_o_calibration__local();
     let o_slide = await f_v_api('POST', '/api/slide', { v_json: { s_name: f_s_name__slide() } });
     let o_microscope = await f_v_api('POST', '/api/microscope', { v_json: { s_name: o_config.s_name__microscope.trim() } });
+    // a value that is not calibrated is stored as empty, not as 0
+    let o_value = {};
+    for(let s_name in o_calibration__local) o_value[s_name] = o_calibration__local[s_name] > 0 ? o_calibration__local[s_name] : null;
     let o_calibration = await f_v_api('POST', `/api/microscope/${o_microscope.n_id}/calibration`, {
-        v_json: { s_name: o_config.s_name__calibration.trim(), ...o_calibration__local },
+        v_json: { s_name: o_config.s_name__calibration.trim(), ...o_value },
     });
     // keep the suggestions of the two name fields up to date
     o_ml.a_o_microscope = (await f_v_api('GET', '/api/microscope')).a_o_microscope;
@@ -1213,6 +1222,7 @@ export {
     f_create_class,
     f_update_class,
     f_delete_class,
+    f_n_cnt__bbox__of_class,
     f_reorder_class,
     f_close_still,
     f_bbox_changed,

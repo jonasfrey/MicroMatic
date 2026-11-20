@@ -40,6 +40,12 @@ const o_component__manual_speed = {
             this.f_set('z', preset.z);
             return this.f_save();
         },
+        // the list of the top bar. a choice gives the keyboard back to the stage:
+        // while a list has the focus, the keys W A S D Q E move no motor.
+        f_on_select(o_evt) {
+            this.f_preset(a_o_speed_preset.find(preset => preset.s_name === o_evt.target.value));
+            o_evt.target.blur();
+        },
     },
     template: `
         <div class="manual-speeds" :class="{ 'manual-speeds--compact': b_compact }" aria-label="Manual movement speeds">
@@ -62,7 +68,7 @@ const o_component__manual_speed = {
                 <span aria-hidden="true">{{ (s_preset || 'Custom').slice(0, 3) }}…</span><ui_icon s_name="speed" /><ui_icon s_name="chevron" />
             <select class="manual-speed-select" :value="s_preset" aria-label="Movement speed preset"
                 :title="s_speed_title"
-                @change="f_preset(a_o_speed_preset.find(preset => preset.s_name === $event.target.value))">
+                @change="f_on_select">
                 <option value="" disabled>Custom</option>
                 <option v-for="preset in a_o_speed_preset" :key="preset.s_name" :value="preset.s_name">{{ preset.s_name }}</option>
             </select>

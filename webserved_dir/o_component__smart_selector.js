@@ -14,6 +14,9 @@ import { f_s_text__short, f_a_o_object__sorted } from './smart_selector.module.j
 // +       popup with empty fields and "create". a kind that is not made of
 //         fields (a file) says itself what "+" does.
 //
+// Each popup has a title line that says what it is for and a button to close
+// it: without it a popup was not recognised as one (user test 2026-11-19).
+//
 // The element knows nothing about what the objects are: the objects, their
 // fields and what create, update, delete and choose do are handed to it.
 
@@ -80,8 +83,12 @@ let o_component__smart_selector = {
                 :aria-label="'New ' + s_name__kind" :aria-haspopup="f_create ? null : 'dialog'" :aria-expanded="f_create ? null : s_popup === 'create'"
                 :data-tooltip="'New ' + s_name__kind + (s_tooltip__create ? '\\n' + s_tooltip__create : '')"><ui_icon s_name="plus" /></button>
             <teleport to="body">
-                <div ref="el_popup" class="smart-selector-popup smart-selector-list" v-if="s_popup === 'option'" role="listbox"
-                    :aria-label="s_name__kind__capital + ' list'" :style="o_style__popup">
+                <div ref="el_popup" class="smart-selector-popup smart-selector-list" v-if="s_popup === 'option'" :style="o_style__popup">
+                    <div class="smart-selector-title">
+                        <ui_icon s_name="list" /><span>{{ s_title__popup }}</span>
+                        <button type="button" class="smart-selector-close" data-control-skip @click="f_close_popup" aria-label="Close" data-tooltip="Close · Esc">&times;</button>
+                    </div>
+                    <div role="listbox" :aria-label="s_name__kind__capital + ' list'">
                     <div class="smart-selector-option" v-for="o_option in a_o_option" :key="o_option.o_object.n_id" role="option" tabindex="0"
                         :class="{ active: o_option.o_object.n_id === n_id }" :aria-selected="o_option.o_object.n_id === n_id"
                         @click="f_choose(o_option.o_object)" @keydown.enter.prevent="f_choose(o_option.o_object)" @keydown.space.prevent="f_choose(o_option.o_object)">
@@ -97,9 +104,14 @@ let o_component__smart_selector = {
                             @click.stop="f_delete(o_option.o_object)" @keydown.enter.stop @keydown.space.stop
                             :aria-label="'Delete ' + s_name__kind + ' ' + o_option.s_value" :data-tooltip="'Delete this ' + s_name__kind"><ui_icon s_name="trash" /></button>
                     </div>
+                    </div>
                 </div>
                 <form ref="el_popup" class="smart-selector-popup smart-selector-form" v-else-if="s_popup !== ''" role="dialog"
-                    :aria-label="(s_popup === 'create' ? 'New ' : 'Edit ') + s_name__kind" :style="o_style__popup" @submit.prevent="f_submit">
+                    :aria-label="s_title__popup" :style="o_style__popup" @submit.prevent="f_submit">
+                    <div class="smart-selector-title">
+                        <ui_icon :s_name="s_popup === 'create' ? 'plus' : 'edit'" /><span>{{ s_title__popup }}</span>
+                        <button type="button" class="smart-selector-close" data-control-skip @click="f_close_popup" aria-label="Close" data-tooltip="Close · Esc">&times;</button>
+                    </div>
                     <div class="cockpit-field" v-for="o_field in a_o_field" :key="o_field.s_key">
                         <label :for="s_id + o_field.s_key">{{ o_field.s_label }}</label>
                         <div class="smart-selector-number" v-if="o_field.s_type === 'number'">
@@ -162,6 +174,11 @@ let o_component__smart_selector = {
         },
         b_valid: function() {
             return String(this.o_value[this.s_key] ?? '').trim() !== '';
+        },
+        // what the open popup is for, as its title line says it
+        s_title__popup: function() {
+            if(this.s_popup === 'option') return this.s_name__kind__capital + ' list';
+            return (this.s_popup === 'create' ? 'New ' : 'Edit ') + this.s_name__kind;
         },
     },
     methods: {
@@ -257,6 +274,12 @@ let o_component__smart_selector = {
             if(!b_done || o_self.s_popup !== s_popup) return;
             o_self.f_close();
             o_self.$refs['el_button__' + s_popup].focus();
+        },
+        // the close button of the title line: like Escape, the focus goes back to where the popup came from
+        f_close_popup: function() {
+            let s_popup = this.s_popup;
+            this.f_close();
+            if(s_popup !== '') this.$refs['el_button__' + s_popup].focus();
         },
         // a press anywhere else closes the popup
         f_on_pointer: function(o_evt) {

@@ -3,23 +3,24 @@ import { o_state, f_send_esp_stop_all, f_send_esp_set_backlash, f_save_setting__
 import { f_flash_browser } from './flash_browser.module.js';
 import { f_o_wsmsg } from './constructors.module.js';
 import { f_s_hardware_led_config_error } from './hardware_led.module.js';
+import { f_s_hint__port_not_chosen } from './serial_hint.module.js';
+import { o_component__camera_select } from './o_component__camera_select.js';
 
 let o_component__setup = {
     name: 'component-setup',
-    components: { ui_icon: o_component__icon },
+    components: { ui_icon: o_component__icon, o_component__camera_select },
     template: `
         <section class="overlay-panel panel-setup microcontroller-settings" :class="{ visible: o_state.o_panel_visibility.setup }" aria-label="Microcontroller settings">
             <div class="panel-header">
                 <h2><ui_icon s_name="chip" /> Microcontroller <span class="microcontroller-model">ESP32</span></h2>
-                <span class="panel-drag-hint" title="Drag to move"><ui_icon s_name="move" /></span>
                 <button class="panel-close" @click="f_close" :disabled="o_state.b_flashing" aria-label="Close Setup">×</button>
             </div>
             <div class="panel-body">
                 <fieldset class="micro-wiring" :disabled="b_hardware_busy" aria-label="Motor wiring">
                     <div class="micro-pin-headings" aria-hidden="true"><span></span><span v-for="pin in [1, 2, 3, 4]">Pin {{ pin }}</span></div>
                     <div class="micro-pin-row" v-for="(motor, index) in o_state.a_o_pin_config" :key="index">
-                        <span class="micro-row-label" :data-tooltip="'Motor ' + (index + 1)">M{{ index + 1 }}</span>
-                        <label class="micro-pin" v-for="pin in [1, 2, 3, 4]" :key="pin" :data-tooltip="'Motor ' + (index + 1) + ' · Pin ' + pin + ' · ESP32 GPIO'">
+                        <span class="micro-row-label" :data-tooltip="'Motor ' + (index + 1) + '\\nOne stepper motor with its driver board. The four numbers of this row say where the board is wired to the ESP32.'">M{{ index + 1 }}</span>
+                        <label class="micro-pin" v-for="pin in [1, 2, 3, 4]" :key="pin" :data-tooltip="'Motor ' + (index + 1) + ' · Pin ' + pin + '\\nNumber of the ESP32 pin (GPIO) that input IN' + pin + ' of the driver board is wired to. A change takes effect after Flash.'">
                             <ui_icon s_name="gpio" />
                             <input type="number" min="0" max="48" step="1" :aria-label="'Motor ' + (index + 1) + ' pin ' + pin"
                                 v-model.number="motor['n_pin' + pin]" @change="f_save_pin_config" />
@@ -31,7 +32,7 @@ let o_component__setup = {
                         <label class="micro-row-label" :for="'axis-motor-' + axis">{{ axis.toUpperCase() }}</label>
                         <select :id="'axis-motor-' + axis" :aria-label="axis.toUpperCase() + ' motor'" :disabled="b_hardware_busy"
                             :value="o_state.o_motor__axis[axis] === null ? 'none' : o_state.o_motor__axis[axis]"
-                            :data-tooltip="axis.toUpperCase() + ' motor · choosing an assigned motor swaps the axes'"
+                            :data-tooltip="f_s_tooltip__axis(axis)"
                             @change="f_assign_axis(axis, $event.target.value === 'none' ? null : Number($event.target.value))">
                             <option v-for="(motor, index) in o_state.a_o_pin_config" :key="index" :value="index">M{{ index + 1 }}</option>
                             <option v-if="axis === 'z'" value="none">Manual</option>
@@ -41,18 +42,18 @@ let o_component__setup = {
                             :data-control-scope="o_state.o_motor__axis[axis]"
                             :aria-pressed="f_b_direction_reversed(o_state.o_motor__axis[axis])" :aria-label="'Reverse ' + axis.toUpperCase() + ' direction'"
                             :disabled="b_hardware_busy || o_state.o_motor__axis[axis] === null"
-                            :data-tooltip="'Reverse ' + axis.toUpperCase() + ' · keyboard, mouse and gamepad'"
+                            :data-tooltip="'Reverse ' + axis.toUpperCase() + '\\nTurns the direction of this axis around for keyboard, mouse and gamepad. Switch it when the image moves the wrong way.'"
                             @click="f_reverse_direction(o_state.o_motor__axis[axis], !f_b_direction_reversed(o_state.o_motor__axis[axis]))">
                             <ui_icon :s_name="f_b_direction_reversed(o_state.o_motor__axis[axis]) ? 'checked' : 'unchecked'" /><span>Reverse</span>
                         </button>
-                        <label class="micro-backlash" :data-tooltip="axis.toUpperCase() + ' backlash compensation · motor steps'">
+                        <label class="micro-backlash" :data-tooltip="axis.toUpperCase() + ' backlash · motor steps\\nPlay in the drive: steps the motor turns after a change of direction before anything moves. They are added at every change of direction. 0 switches it off. The button at the end of the row measures it.'">
                             <input type="number" min="0" step="1" :aria-label="axis.toUpperCase() + ' backlash steps'"
                                 :value="o_state.o_motor__axis[axis] === null ? '' : o_state.a_n_step__backlash[o_state.o_motor__axis[axis]]"
                                 :disabled="b_hardware_busy || o_state.o_motor__axis[axis] === null"
                                 @change="f_set_axis_backlash(axis, $event)" />
                             <ui_icon s_name="backlash" />
                         </label>
-                        <label v-if="axis !== 'z'" class="micro-scale" :data-tooltip="axis.toUpperCase() + ' motor steps per camera pixel · used to space scan images'">
+                        <label v-if="axis !== 'z'" class="micro-scale" :data-tooltip="axis.toUpperCase() + ' steps per pixel\\nMotor steps that move the image by one camera pixel. Spaces the images of a scan and is stored with the images of ML Training. It belongs to the objective in use. The button at the end of the row measures it.'">
                             <input type="number" min="0" step="any" :aria-label="axis.toUpperCase() + ' steps per pixel'"
                                 :value="f_s_step__per_px(axis)"
                                 :disabled="b_hardware_busy || o_state.o_motor__axis[axis] === null"
@@ -62,7 +63,7 @@ let o_component__setup = {
                         <span v-else class="micro-scale" aria-hidden="true"></span>
                         <button class="micro-icon-button" :class="{ active: s_axis__calibrating === axis }"
                             :aria-label="(s_axis__calibrating === axis ? 'Stop calibrating ' : 'Calibrate ') + axis.toUpperCase()"
-                            :data-tooltip="s_axis__calibrating === axis ? 'Stop calibration' : 'Auto-calibrate ' + axis.toUpperCase() + ' · use a textured sample' + (axis === 'z' ? ', start slightly out of focus' : '')"
+                            :data-tooltip="s_axis__calibrating === axis ? 'Stop calibration' : f_s_tooltip__calibrate(axis)"
                             :disabled="s_axis__calibrating !== axis && (!b_can_move || !o_state.b_streaming__webcam || o_state.o_motor__axis[axis] === null)"
                             @click="f_calibrate_axis(axis)"><ui_icon :s_name="s_axis__calibrating === axis ? 'stop' : 'settings'" /></button>
                     </div>
@@ -78,16 +79,20 @@ let o_component__setup = {
                         <ui_icon s_name="usb" />{{ b_disconnecting__usb ? 'Disconnecting…' : 'Disconnect' }}
                     </button>
                     <button v-else class="micro-action" @click="f_connect_usb" aria-label="Connect via USB"
-                        :disabled="b_hardware_busy || !o_state.b_available__serial || o_state.b_connecting__esp_serial" data-tooltip="Connect to ESP32 via USB · Web Serial">
+                        :disabled="b_hardware_busy || !o_state.b_available__serial || o_state.b_connecting__esp_serial"
+                        data-tooltip="Connect&#10;Opens the browser's list of USB devices. Choose the ESP32 in it. The browser remembers the choice and connects by itself the next time.">
                         <ui_icon s_name="usb" />{{ o_state.b_connecting__esp_serial ? 'Connecting…' : 'Connect' }}
                     </button>
-                    <button class="micro-action micro-action--flash" :disabled="!b_enabled__flash" @click="f_start_flash" aria-label="Flash ESP32" :data-tooltip="s_hint__flash + ' Pin and startup changes apply after Flash.'">
+                    <button class="micro-action micro-action--flash" :disabled="!b_enabled__flash" @click="f_start_flash" aria-label="Flash ESP32" :data-tooltip="'Flash\\nWrites the motor program onto the ESP32. Needed once for a new ESP32. Pin and startup changes apply after Flash. ' + s_hint__flash">
                         <ui_icon s_name="flash" />{{ o_state.b_flashing ? 'Flashing…' : 'Flash' }}
                     </button>
                 </div>
                 <p v-if="s_pin_error" class="micro-error" role="alert">{{ s_pin_error }}</p>
                 <p v-if="o_state.s_error__esp_serial" class="micro-error" role="alert">{{ o_state.s_error__esp_serial }}</p>
+                <p v-if="o_state.s_hint__esp_serial" class="micro-hint micro-hint--port" role="status">{{ o_state.s_hint__esp_serial }}</p>
                 <p v-if="!o_state.b_available__serial" class="micro-hint">USB requires Chrome or Edge on HTTPS or localhost.</p>
+                <div class="micro-connection micro-connection--camera" role="status"><span class="dot" :class="{ connected: o_state.b_streaming__webcam }"></span>{{ s_camera_status }}</div>
+                <o_component__camera_select />
                 <section v-if="o_state.b_flashing || o_state.s_flash_output" class="micro-flash-progress" aria-label="Flash progress">
                     <span class="flash-status-badge" :class="o_state.s_flash_status" role="status">{{ s_flash_status_label }}</span>
                     <pre class="flash-console" ref="el_pre__flash">{{ o_state.s_flash_output }}</pre>
@@ -97,6 +102,17 @@ let o_component__setup = {
                 <o_component__jog />
             </div>
         </section>
+        <teleport to="body">
+            <!-- in the middle of the camera image, like a capture of ML Training: the calibration moves the stage for a while -->
+            <div class="ml-progress-backdrop ml-progress-backdrop--free" v-if="s_axis__calibrating">
+                <div class="ml-progress" role="status" :data-tooltip="'Calibrating ' + s_axis__calibrating.toUpperCase() + '\\n' + s_status__axis">
+                    <span class="ml-progress-spinner" aria-hidden="true"></span>
+                    <span class="ml-progress-text">calibrating {{ s_axis__calibrating.toUpperCase() }}</span>
+                    <button class="btn-small" data-control-skip @click="f_calibrate_axis(s_axis__calibrating)" aria-label="stop calibration"
+                        data-tooltip="Stop&#10;End the calibration now.">stop</button>
+                </div>
+            </div>
+        </teleport>
     `,
     data: function() {
         return {
@@ -120,6 +136,10 @@ let o_component__setup = {
             if (o_state.b_connecting__esp_serial) return 'Connecting…';
             if (!o_state.b_connected__esp) return 'Disconnected';
             return 'USB connected';
+        },
+        s_camera_status() {
+            if (o_state.b_streaming__webcam) return 'Camera live';
+            return o_state.o_error__webcam ? o_state.o_error__webcam.s_title : 'No camera';
         },
         b_can_move: function() {
             return o_state.b_connected__esp && !this.b_hardware_busy;
@@ -159,6 +179,16 @@ let o_component__setup = {
         },
     },
     methods: {
+        f_s_tooltip__axis(axis) {
+            let s_axis = axis.toUpperCase();
+            if (axis === 'z') return s_axis + ' motor\nThe motor that turns the focus. Manual: no motor, the focus is turned by hand. Choosing a motor that another axis uses swaps the two.';
+            return s_axis + ' motor\nThe motor that moves the stage in ' + s_axis + '. Choosing a motor that another axis uses swaps the two.';
+        },
+        f_s_tooltip__calibrate(axis) {
+            let s_axis = axis.toUpperCase();
+            if (axis === 'z') return 'Auto-calibrate ' + s_axis + '\nMeasures the backlash of the focus from the sharpness of the camera image; the focus moves for a while. Needs the camera, the connected ESP32 and a sample with visible detail. Start slightly out of focus.';
+            return 'Auto-calibrate ' + s_axis + '\nMeasures backlash and steps per pixel from the camera image; the stage moves back and forth for a while. Needs the camera, the connected ESP32 and a sample with visible detail.';
+        },
         async f_calibrate_axis(axis) {
             const motor = o_state.o_motor__axis[axis];
             const calibration = this.$refs.a_calibration?.find(item => item.n_motor === motor);
@@ -275,6 +305,7 @@ let o_component__setup = {
         },
         f_start_flash: async function() {
             if (!this.b_enabled__flash) return;
+            o_state.s_hint__esp_serial = '';
             o_state.b_flashing = true;
             o_state.s_flash_status = 'flashing';
             o_state.s_flash_output = '';
@@ -308,6 +339,8 @@ let o_component__setup = {
             } catch (o_err) {
                 o_state.s_flash_status = o_err.name === 'NotFoundError' ? 'idle' : 'error';
                 f_log(o_err.name === 'NotFoundError' ? 'USB selection cancelled.' : `Error: ${o_err.message}`);
+                // the list of USB devices was closed without a choice: say what to check when the ESP32 was not in it
+                if (o_err.name === 'NotFoundError') o_state.s_hint__esp_serial = f_s_hint__port_not_chosen();
             } finally {
                 f_unregister();
                 o_state.b_flashing = false;
@@ -334,8 +367,18 @@ let o_component__setup = {
             f_save_setting('a_o_pin_config', o_state.a_o_pin_config);
         },
     },
+    watch: {
+        // the mouse jog stands down while the stage is probed: its mark in the
+        // middle of the image makes room for the message of the calibration
+        s_axis__calibrating: function(s_axis) {
+            document.body.classList.toggle('axis-calibrating', s_axis !== '');
+        },
+    },
     mounted: function() {
         this.f_check_arduino_cli();
+    },
+    beforeUnmount: function() {
+        document.body.classList.remove('axis-calibrating');
     },
 };
 

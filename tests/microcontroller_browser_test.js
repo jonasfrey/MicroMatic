@@ -17,6 +17,7 @@ for (const width of [1440, 800, 360, 320]) Deno.test(`microcontroller drawing la
                 a_o_motor: [0, 1, 2].map(() => ({ b_running: false, n_position: 0, n_rpm: 0, s_direction: 'cw' })),
                 o_config__hardware_led: f_o_hardware_led_config(), o_hardware_led: null, s_error__hardware_led: '',
                 b_connected__esp: false, b_streaming__webcam: false, b_available__serial: true,
+                s_id__webcam_device: '', a_o_device__webcam: [{ deviceId: 'cam1', label: 'HY-800B' }], o_error__webcam: null, s_hint__esp_serial: '',
                 b_scanning: false, b_flashing: false, n_cnt__stop_all: 0, b_connecting__esp_serial: false,
                 n_rpm__jog: 5, n_rpm__focus_jog: 0.5, a_o_setting: [], o_calibration: {},
                 s_error__esp_serial: '', s_flash_output: '', s_flash_status: 'idle',
@@ -82,6 +83,24 @@ for (const width of [1440, 800, 360, 320]) Deno.test(`microcontroller drawing la
                 check(field('Calibrate X').disabled && field('Calibrate Z').disabled, 'Offline calibration blocked');
                 check(!document.querySelector('.micro-diagnostics, .hardware-motor') && !panel.textContent.includes('Calibrate all'), 'No motor test section');
                 check(!document.querySelector('[aria-label="ESP32 IP address"]') && !document.querySelector('input[type="password"]'), 'No Wi-Fi controls');
+                // every window moves by its header: no pictogram that says so on this one alone
+                check(!panel.querySelector('.panel-drag-hint') && !panel.querySelector('[title="Drag to move"]'), 'No drag hint in the header');
+                // each control explains itself: a first line that names it, below it what it is for
+                for (const label of ['Motor 1 pin 1', 'X motor', 'Z motor', 'Reverse X direction', 'X backlash steps', 'X steps per pixel', 'Calibrate X', 'Calibrate Z', 'Connect via USB', 'Flash ESP32']) {
+                    const tooltip = field(label).closest('[data-tooltip]').dataset.tooltip;
+                    check(/^[^\\n]{3,40}\\n.{40,}/s.test(tooltip), 'Tooltip explains ' + label + ': ' + tooltip);
+                }
+                check(field('Z motor').dataset.tooltip.includes('by hand') && field('Calibrate Z').dataset.tooltip.includes('sharpness'), 'Focus axis has its own explanation');
+                // the camera is chosen next to the USB connection, and says how it stands
+                check(panel.querySelector('.micro-connection--camera').textContent.trim() === 'No camera', 'Camera state shown');
+                check([...field('Camera').options].map(option => option.textContent).join('|') === 'Select camera|HY-800B' && panel.contains(field('Camera')), 'Camera list in the window');
+                await edit('Camera', 'cam1');
+                check(o_state.s_id__webcam_device === 'cam1' && calls.saved.s_id__webcam_device === 'cam1', 'Camera chosen and saved');
+                o_state.o_error__webcam = { s_title: 'Camera in use', s_detail: 'Another program holds the camera.' }; await tick();
+                check(panel.querySelector('.micro-connection--camera').textContent.trim() === 'Camera in use' && field('Camera').closest('[data-tooltip]').dataset.tooltip.includes('Another program holds the camera.'), 'Camera problem shown');
+                o_state.o_error__webcam = null; o_state.b_streaming__webcam = true; await tick();
+                check(panel.querySelector('.micro-connection--camera').textContent.trim() === 'Camera live' && panel.querySelector('.micro-connection--camera .dot.connected'), 'Live camera shown');
+                o_state.b_streaming__webcam = false; await tick();
                 await edit('Motor 1 pin 1', '18');
                 check(calls.saved.a_o_pin_config[0].n_pin1 === 18, 'Motor pin saved');
                 await edit('Motor 1 pin 1', '9');
@@ -137,11 +156,26 @@ for (const width of [1440, 800, 360, 320]) Deno.test(`microcontroller drawing la
                 const calibration = vm.$refs.a_calibration.find(item => item.n_motor === 2);
                 calibration.f_run = () => new Promise(resolve => {finish = resolve;});
                 calibration.f_stop = () => {calls.stoppedCalibration = true; finish(false);};
+                check(!document.querySelector('.ml-progress'), 'No calibration message while nothing is calibrated');
                 await click('Calibrate X');
                 check(field('X motor').disabled && field('Flash ESP32').disabled, 'Calibration locks hardware changes');
                 calibration.s_status = 'measuring — 40 steps'; await tick();
                 check(panel.textContent.includes('X · measuring — 40 steps'), 'Calibration progress shows in the axis status');
+                // the calibration says in the middle of the camera image that it is at work, and can be stopped there
+                const progress = document.querySelector('.ml-progress');
+                check(progress && progress.querySelector('.ml-progress-text').textContent === 'calibrating X' && progress.querySelector('.ml-progress-spinner'), 'Calibration message on the image');
+                const area = progress.getBoundingClientRect();
+                const top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--topbar-h')) || 0;
+                check(Math.abs((area.left + area.right) / 2 - innerWidth / 2) <= 1 && Math.abs((area.top + area.bottom) / 2 - (top + (innerHeight - top) / 2)) <= 1, 'Calibration message is centred on the image');
+                check(area.left >= 0 && area.right <= innerWidth, 'Calibration message fits the viewport');
+                check(progress.dataset.tooltip.includes('measuring — 40 steps'), 'Calibration message carries the progress');
+                check(getComputedStyle(progress.parentElement).pointerEvents === 'none' && getComputedStyle(progress).pointerEvents === 'auto', 'The image stays free while the message shows');
+                check(document.body.classList.contains('axis-calibrating'), 'The mark of the mouse jog makes room for the message');
                 await click('Stop calibrating X'); check(calls.stoppedCalibration && vm.s_axis__calibrating === '', 'Per-axis calibration can stop');
+                check(!document.querySelector('.ml-progress') && !document.body.classList.contains('axis-calibrating'), 'Calibration message goes when the calibration ends');
+                calls.stoppedCalibration = false;
+                await click('Calibrate X'); await click('stop calibration');
+                check(calls.stoppedCalibration && vm.s_axis__calibrating === '' && !document.querySelector('.ml-progress'), 'Calibration stops from its message');
                 const nested = f_a_control_results().find(item => item.name === 'LED count');
                 check(nested, 'LED count is searchable'); await f_reveal_control(nested); await tick();
                 check(document.querySelector('.micro-led-details').open, 'Search reveals advanced LED option');
@@ -149,7 +183,16 @@ for (const width of [1440, 800, 360, 320]) Deno.test(`microcontroller drawing la
                 o_state.b_scanning = true; await tick();
                 check(field('X motor').disabled && field('Flash ESP32').disabled && field('Disconnect controller').disabled, 'Active scan locks settings and connection');
                 o_state.b_scanning = false; await tick();
+                // the list of USB devices is closed without a choice: nothing is flashed, and it is said what to check when the ESP32 was not in it
+                const requestPort = navigator.serial.requestPort;
+                navigator.serial.requestPort = async () => { throw new DOMException('No port selected by the user.', 'NotFoundError'); };
+                await click('Flash ESP32'); await tick();
+                check(calls.flash === 0 && o_state.s_flash_status === 'idle' && !o_state.b_flashing, 'Nothing flashed without a device');
+                check(panel.querySelector('.micro-hint--port')?.textContent.startsWith('No device chosen.') && panel.querySelector('.micro-hint--port').textContent.includes('USB cable'), 'Hint after the device list was closed');
+                navigator.serial.requestPort = requestPort;
+                o_state.s_flash_output = ''; await tick();
                 await click('Flash ESP32');
+                check(!panel.querySelector('.micro-hint--port'), 'Hint goes with the next attempt');
                 await new Promise(resolve => setTimeout(resolve, 1600)); await tick();
                 check(calls.flash === 1 && calls.compile.v_data.a_o_pin_config[0].n_pin1 === 5, 'Flash uses drawn pin configuration');
                 check(calls.compile.v_data.o_config__hardware_led.o_startup.n_white === 255 && calls.usb === 2, 'Flash includes startup LED and reconnects USB');

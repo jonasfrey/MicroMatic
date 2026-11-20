@@ -11,6 +11,7 @@ Deno.test('camera window applies, saves and restores resolution and controls on 
             import { reactive } from './lib/vue.esm-browser.js';
             export const o_state = reactive({ o_camera: { o_capability: {}, a_o_mode: [], a_o_control: [], n_ts_ms__apply: 0 },
                 o_panel_visibility: { camera_setting: true }, a_o_setting: [], b_streaming__webcam: true,
+                s_id__webcam_device: 'cam1', a_o_device__webcam: [{ deviceId: 'cam1', label: 'Test USB camera' }, { deviceId: 'cam2', label: 'Second camera' }], o_error__webcam: null,
                 o_filter: {}, o_flat_field: { b_active: false } });
             export function f_save_setting(s_key, v_value) {
                 o_state.a_o_setting = [...o_state.a_o_setting.filter(o => o.s_key !== s_key), { s_key, s_value: JSON.stringify(v_value) }];
@@ -64,7 +65,15 @@ Deno.test('camera window applies, saves and restores resolution and controls on 
                 let o_camera = o_state.o_camera;
                 await f_apply_camera__saved();
                 await nextTick();
-                let [el_fps, el_resolution] = document.querySelectorAll('select');
+                // the camera itself is chosen in this window too, above its settings
+                let el_camera = document.querySelector('.panel-camera-setting select[aria-label="Camera"]');
+                let s_camera = [...el_camera.options].map(el => el.textContent.trim()).join(' | ') + ' / ' + el_camera.value;
+                if (s_camera !== 'Select camera | Test USB camera | Second camera / cam1') throw Error('Camera list: ' + s_camera);
+                if (!(el_camera.compareDocumentPosition(document.querySelector('.camera-setting-stack')) & Node.DOCUMENT_POSITION_FOLLOWING)) throw Error('The camera list stands above the settings');
+                el_camera.value = 'cam2'; el_camera.dispatchEvent(new Event('change', { bubbles: true })); await nextTick();
+                if (o_state.s_id__webcam_device !== 'cam2') throw Error('Camera not chosen: ' + o_state.s_id__webcam_device);
+                el_camera.value = 'cam1'; el_camera.dispatchEvent(new Event('change', { bubbles: true })); await nextTick();
+                let [el_fps, el_resolution] = document.querySelectorAll('.camera-setting-stack select');
                 let s_list = [...el_resolution.options].map(el => el.value).join(' ');
                 if (s_list !== '640x480 1280x720 1920x1080' || el_resolution.value !== '640x480') throw Error('Resolution list is not the sensor sizes of the camera: ' + s_list + ' / ' + el_resolution.value);
 
@@ -80,18 +89,18 @@ Deno.test('camera window applies, saves and restores resolution and controls on 
                 document.querySelector('.mode-btn').click();
                 await f_wait();
                 if (o_camera.s_mode__exposure !== 'manual') throw Error('Exposure mode not applied');
-                await f_change(document.querySelectorAll('select')[2], '333');
+                await f_change(document.querySelectorAll('.camera-setting-stack select')[2], '333');
                 if (o_camera.n_time__exposure !== 333) throw Error('Exposure time not applied');
                 let el_fine = document.querySelector('[aria-label="Exposure fine tune"]');
                 if (Number(el_fine.value) !== 0) throw Error('Fine tune is not centred on a coarse time: ' + el_fine.value);
                 await f_change(el_fine, '0.25');
                 if (o_camera.n_time__exposure !== 396) throw Error('Fine tune not applied: ' + o_camera.n_time__exposure);
-                if (document.querySelectorAll('select')[2].value !== '333') throw Error('Fine tune changed the coarse selection');
+                if (document.querySelectorAll('.camera-setting-stack select')[2].value !== '333') throw Error('Fine tune changed the coarse selection');
                 if (Math.abs(Number(el_fine.value) - 0.25) > 0.01) throw Error('Fine tune slider does not show the live time: ' + el_fine.value);
                 if (!document.querySelector('.camera-setting-stack').textContent.includes('39.6 ms')) throw Error('Exposure time readout missing');
                 for (let [s_stop, n_time, s_coarse] of [[el_fine.max, 471, '333'], [el_fine.min, 236, '333']]) {
                     await f_change(el_fine, s_stop);
-                    if (o_camera.n_time__exposure !== n_time || document.querySelectorAll('select')[2].value !== s_coarse) throw Error('Fine tune end ' + s_stop + ' gave ' + o_camera.n_time__exposure);
+                    if (o_camera.n_time__exposure !== n_time || document.querySelectorAll('.camera-setting-stack select')[2].value !== s_coarse) throw Error('Fine tune end ' + s_stop + ' gave ' + o_camera.n_time__exposure);
                 }
                 await f_change(el_fine, '0.25');
 
@@ -132,7 +141,7 @@ Deno.test('camera window applies, saves and restores resolution and controls on 
                 o_state.a_o_setting = [{ s_key: 'o_camera_resolution', s_value: JSON.stringify({ 'usb-test': { n_width: 2560, n_height: 1440, n_frame_rate: 30 } }) }];
                 await f_apply_camera__saved();
                 await nextTick();
-                if (o_camera.n_width !== 640 || o_camera.s_error__resolution || document.querySelectorAll('select')[1].value !== '640x480') throw Error('Unknown saved size: ' + o_camera.n_width + ' ' + o_camera.s_error__resolution);
+                if (o_camera.n_width !== 640 || o_camera.s_error__resolution || document.querySelectorAll('.camera-setting-stack select')[1].value !== '640x480') throw Error('Unknown saved size: ' + o_camera.n_width + ' ' + o_camera.s_error__resolution);
                 document.body.setAttribute('data-result', 'PASS');
             } catch (o_error) { document.body.setAttribute('data-result', 'FAIL: ' + o_error.stack); }
             finally { f_camera_stopped(); }

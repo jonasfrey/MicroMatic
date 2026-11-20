@@ -91,7 +91,7 @@ Deno.test('browser flash submits saved LED config and reconnects to new firmware
     const state = { o_config__hardware_led: f_o_hardware_led_config({ b_enabled: true }), a_o_pin_config: pins };
     const calls = [];
     const port = {};
-    const bindings = { o_component__icon,
+    const bindings = { o_component__icon, o_component__camera_select: {},
         o_state: state, f_s_hardware_led_config_error,
         navigator: { serial: { requestPort: async () => port } },
         f_disconnect_esp: async () => calls.push('disconnect'),

@@ -24,6 +24,7 @@ import {
     f_create_class,
     f_update_class,
     f_delete_class,
+    f_n_cnt__bbox__of_class,
     f_reorder_class,
     f_b_view__held,
     f_discard_bbox__camera,
@@ -82,11 +83,11 @@ let o_component__ml_training = {
     template: `
         <teleport to="#toolbar-ml" defer>
             <template v-if="o_state.o_panel_visibility.ml_training">
-                <button class="ml-chip" :class="{ warning: !o_calibration.n_um_per_px }" data-control-skip @click="f_open_panel('scale')"
-                    aria-label="µm per px" :data-tooltip="'µm per px\\n' + (o_calibration.n_um_per_px ? 'Size of one image pixel. Stored with every image.' : 'Not calibrated for this camera image. Click to open the Size window.')">
+                <button class="ml-chip" :class="{ empty: !o_calibration.n_um_per_px }" data-control-skip @click="f_open_panel('scale')"
+                    aria-label="µm per px" :data-tooltip="'µm per px\\n' + (o_calibration.n_um_per_px ? 'Size of one image pixel. Stored with every image.' : 'Not calibrated for this camera image. Images are stored without it. Click to open the Size window.')">
                     <ui_icon s_name="scale" /><span>{{ s_um_per_px }}</span></button>
-                <button class="ml-chip" :class="{ warning: !b_px_per_step }" data-control-skip @click="f_open_panel('setup')"
-                    aria-label="px per step" :data-tooltip="'px per step, X · Y\\n' + (b_px_per_step ? 'Image pixels the picture moves per motor step. Stored with every image.' : 'Not calibrated. Click to open Setup.')">
+                <button class="ml-chip" :class="{ empty: !b_px_per_step }" data-control-skip @click="f_open_panel('setup')"
+                    aria-label="px per step" :data-tooltip="'px per step, X · Y\\n' + (b_px_per_step ? 'Image pixels the picture moves per motor step. Stored with every image.' : 'Not calibrated. Images are stored without it. Click to open Setup.')">
                     <ui_icon s_name="motor" /><span>{{ s_px_per_step }}</span></button>
             </template>
             <ml_slide />
@@ -99,14 +100,14 @@ let o_component__ml_training = {
                     <ui_icon s_name="user" /><span>{{ o_ml.o_person.s_name }}</span></span>
                 <button class="toolbar-toggle toolbar-icon" data-control-skip @click="f_logout" aria-label="Log out" data-tooltip="Log out"><ui_icon s_name="logout" /></button>
             </template>
-            <form class="ml-login" v-else-if="o_ml.b_probed && o_ml.b_reachable" @submit.prevent="f_login">
+            <form class="ml-login" v-else-if="o_ml.b_probed && o_ml.b_reachable" autocomplete="off" @submit.prevent="f_login">
                 <label class="ml-chip ml-chip--field" data-tooltip="Organisation&#10;1 to 40 characters: a-z, 0-9, _ and -&#10;A new name creates a new, empty organisation.">
                     <ui_icon s_name="organisation" />
-                    <input id="ml-login-organisation" type="text" data-control-skip aria-label="Organisation" placeholder="organisation" v-model.trim="s_name__organisation" autocomplete="organization" spellcheck="false" maxlength="40" />
+                    <input id="ml-login-organisation" type="text" data-control-skip aria-label="Organisation" placeholder="organisation" v-model.trim="s_name__organisation" autocomplete="off" spellcheck="false" maxlength="40" />
                 </label>
                 <label class="ml-chip ml-chip--field" data-tooltip="Name&#10;1 to 40 characters: a-z, 0-9, _ and -">
                     <ui_icon s_name="user" />
-                    <input id="ml-login-person" type="text" data-control-skip aria-label="Name" placeholder="name" v-model.trim="s_name__person" autocomplete="username" spellcheck="false" maxlength="40" />
+                    <input id="ml-login-person" type="text" data-control-skip aria-label="Name" placeholder="name" v-model.trim="s_name__person" autocomplete="off" spellcheck="false" maxlength="40" />
                 </label>
                 <button class="toolbar-toggle toolbar-icon" type="submit" data-control-skip :disabled="!s_name__person || !s_name__organisation || o_ml.s_activity !== ''" aria-label="log in" data-tooltip="Log in"><ui_icon s_name="go" /></button>
             </form>
@@ -144,7 +145,7 @@ let o_component__ml_training = {
                                 <input id="ml-microscope" type="text" data-control-skip list="ml-microscope-list" maxlength="100"
                                     v-model="o_state.o_ml_config.s_name__microscope" @change="f_save_config" />
                             </div>
-                            <div class="cockpit-field" data-tooltip="Objective&#10;Names the calibration, for example 10x. µm per px and px per step of the top bar are stored under this name; changed values become a new calibration.">
+                            <div class="cockpit-field" data-tooltip="Objective&#10;Names the calibration, for example 10x. µm per px and px per step of the top bar are stored under this name, as far as they are measured; changed values become a new calibration.">
                                 <label class="ml-label" for="ml-calibration"><ui_icon s_name="objective" /> objective</label>
                                 <input id="ml-calibration" type="text" data-control-skip list="ml-calibration-list" maxlength="100"
                                     v-model="o_state.o_ml_config.s_name__calibration" @change="f_save_config" />
@@ -176,7 +177,7 @@ let o_component__ml_training = {
                             <div class="ml-class ml-class--new">
                                 <span class="ml-class-key">{{ o_ml.a_o_class.length < 9 ? o_ml.a_o_class.length + 1 : '' }}</span>
                                 <input class="ml-class-name" type="text" data-control-skip aria-label="New class name" placeholder="new class" maxlength="50"
-                                    v-model="s_name__class__new" @keyup.enter="f_create_class" />
+                                    v-model="s_name__class__new" @keyup.enter="f_create_class" @blur="f_create_class" />
                             </div>
                         </div>
                     </div>
@@ -227,7 +228,7 @@ let o_component__ml_training = {
                     </div>
 
                     <div class="cockpit-section" v-if="o_dataset">
-                        <button class="btn-small ml-capture" @click="f_capture" :disabled="b_capture_blocked" aria-label="capture" :data-tooltip="s_tooltip__capture"><ui_icon s_name="camera" /> capture</button>
+                        <button class="btn-small ml-capture" @click="f_capture" :disabled="b_capture_blocked" aria-label="capture" :data-tooltip="s_tooltip__capture"><ui_icon s_name="capture_image" /> capture</button>
                     </div>
 
                     <div class="cockpit-footer" v-if="o_dataset">
@@ -291,6 +292,8 @@ let o_component__ml_training = {
             N_CNT__FOCUS_MAX: N_CNT__FOCUS_MAX,
             s_name__person: '',
             s_name__organisation: '',
+            b_class__creating: false,
+            s_name__class__refused: '',
             s_name__class__new: '',
             a_o_field__dataset: [{ s_key: 's_name', s_label: 'name', n_len__max: 100 }],
             a_o_field__model: [{ s_key: 's_name', s_label: 'name', n_len__max: 100 }],
@@ -489,10 +492,19 @@ let o_component__ml_training = {
             }
             f_delete_dataset(o_dataset);
         },
-        f_create_class: async function() {
+        // Enter creates the class, and so does leaving the field: a typed name is not lost
+        f_create_class: async function(o_evt) {
             let s_name = this.s_name__class__new.trim();
-            if(!s_name) return;
-            if(await f_create_class(s_name)) this.s_name__class__new = '';
+            if(!s_name || this.b_class__creating) return;
+            // a name that was refused stays in the field. leaving the field does not ask for it again.
+            if(o_evt && o_evt.type === 'blur' && s_name === this.s_name__class__refused) return;
+            this.b_class__creating = true;
+            try {
+                if(await f_create_class(s_name)) this.s_name__class__new = '';
+                else this.s_name__class__refused = s_name;
+            } finally {
+                this.b_class__creating = false;
+            }
         },
         f_on_class_name: async function(o_class, o_evt) {
             let s_name = o_evt.target.value.trim();
@@ -504,9 +516,17 @@ let o_component__ml_training = {
         f_on_class_color: function(o_class, o_evt) {
             f_update_class(o_class, { s_color_hex: o_evt.target.value });
         },
+        // asked every time: one click on the wrong row must not take a class away
         f_delete_class: function(o_class) {
-            f_delete_class(o_class, function(n_cnt__bbox) {
-                return confirm('The class "' + o_class.s_name + '" is used by ' + n_cnt__bbox + ' boxes. Delete the class and these boxes?');
+            let f_s_question = function(n_cnt__bbox) {
+                if(n_cnt__bbox === 0) return 'Delete the class "' + o_class.s_name + '"?';
+                return 'The class "' + o_class.s_name + '" is used by ' + n_cnt__bbox + (n_cnt__bbox === 1 ? ' box. Delete the class and this box?' : ' boxes. Delete the class and these boxes?');
+            };
+            let n_cnt__bbox = f_n_cnt__bbox__of_class(o_class);
+            if(!confirm(f_s_question(n_cnt__bbox))) return;
+            // the data server counts the stored boxes itself: it is asked again only when it knows of more
+            f_delete_class(o_class, function(n_cnt__bbox__stored) {
+                return n_cnt__bbox__stored <= n_cnt__bbox || confirm(f_s_question(n_cnt__bbox__stored));
             });
         },
         // the order handle of a class is dragged: the class follows the pointer row by row

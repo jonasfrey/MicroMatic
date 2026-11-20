@@ -5,7 +5,8 @@ import { o_component__tab } from '../webserved_dir/o_component__cockpit.js';
 import assert from 'node:assert/strict';
 
 async function component(name, bindings) {
-    bindings = { f_reset_control, f_reset_title, f_n_rpm__manual, o_component__icon, o_component__tab, ...bindings };
+    // the camera list of the Microcontroller window is a component of its own; a stand-in is enough here
+    bindings = { f_reset_control, f_reset_title, f_n_rpm__manual, o_component__icon, o_component__tab, o_component__camera_select: {}, ...bindings };
     const source = (await Deno.readTextFile(new URL('../webserved_dir/o_component__' + name + '.js', import.meta.url)))
         .replace(/^import\s*\{[\s\S]*?\}\s*from\s*['"][^'"]+['"];?/gm, '')
         .replace(/export \{[^}]+\};?/, '');

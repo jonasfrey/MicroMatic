@@ -8,6 +8,7 @@ import { o_component__actions } from './o_component__actions.js';
 import { f_install_control_catalog } from './control_catalog.module.js';
 import { f_a_control_effects } from './control_effects.module.js';
 import { f_wait_for_esp_status } from './serial_handshake.module.js';
+import { f_s_hint__port_not_chosen, f_s_error__serial_connect } from './serial_hint.module.js';
 import { f_o_hardware_led_config } from './hardware_led.module.js';
 import { f_o_size__default, f_o_size } from './scale_calibration.module.js';
 import { f_b_command__refused } from './view_hold.module.js';
@@ -94,6 +95,8 @@ let o_state = reactive({
     b_connected__esp: false,
     b_connecting__esp_serial: false,
     s_error__esp_serial: '',
+    // what to check when the list of USB devices was closed without a choice
+    s_hint__esp_serial: '',
     b_available__serial: (typeof navigator !== 'undefined') && ('serial' in navigator),
     s_port__esp: '',            // USB serial port path/name when connected via Web Serial
 
@@ -272,6 +275,8 @@ let o_state = reactive({
     s_id__webcam_device: '',
     a_o_device__webcam: [],
     b_streaming__webcam: false,
+    // { s_title, s_detail } while no camera image can be shown and the reason is known, else null
+    o_error__webcam: null,
 
     // USB (UVC) camera hardware settings — one shared object so the toolbar
     // quick bar and the Camera panel always show the same numbers.
@@ -929,6 +934,7 @@ let f_connect_esp_serial = async function(b_request_if_none, o_selected_port = n
     if (!o_state.b_available__serial || o_state.b_flashing || o_state.b_connecting__esp_serial) return false;
     o_state.b_connecting__esp_serial = true;
     o_state.s_error__esp_serial = '';
+    o_state.s_hint__esp_serial = '';
     try {
         let o_port = o_selected_port;
         let a_o_port = o_port ? [o_port] : await navigator.serial.getPorts();
@@ -959,9 +965,12 @@ let f_connect_esp_serial = async function(b_request_if_none, o_selected_port = n
         f_push_esp_config();
         return true;
     } catch (o_err) {
-        // NotFoundError = user cancelled the port picker
-        if (o_err && o_err.name !== 'NotFoundError') {
-            o_state.s_error__esp_serial = o_err.message;
+        // NotFoundError = user cancelled the port picker. that is also all there is
+        // to do when the ESP32 is not in its list, so it is said what to check.
+        if (o_err && o_err.name === 'NotFoundError') {
+            o_state.s_hint__esp_serial = f_s_hint__port_not_chosen();
+        } else if (o_err) {
+            o_state.s_error__esp_serial = f_s_error__serial_connect(o_err);
             console.warn('Serial connect error:', o_err);
             await f_disconnect_esp();
         }

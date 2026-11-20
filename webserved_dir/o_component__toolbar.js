@@ -61,7 +61,7 @@ let o_component__toolbar = {
                 <p v-if="o_control_ui.notice" role="status">{{ o_control_ui.notice }}</p></div>
         </section>
         <section id="toolbar-details" class="overlay-panel toolbar-details" :class="{ visible: b_details }" aria-label="Quick settings">
-            <div class="panel-header"><h2><ui_icon s_name="settings" /> Quick settings</h2><span class="panel-drag-hint" title="Drag to move"><ui_icon s_name="move" /></span>
+            <div class="panel-header"><h2><ui_icon s_name="settings" /> Quick settings</h2>
                 <button class="panel-close" @click="b_details = false" aria-label="Close quick settings">×</button></div>
             <div class="panel-body">
                 <div class="toolbar-row toolbar-row--speed"><o_component__manual_speed s_context="toolbar" /></div>
@@ -110,7 +110,7 @@ let o_component__toolbar = {
             </div>
         </section>
         <section id="toolbar-tools" ref="el_tools" class="overlay-panel toolbar-tools" :class="{ visible: b_tools }" aria-label="All tools">
-            <div class="panel-header"><h2><ui_icon s_name="tools" /> Tools <span class="ui-info" tabindex="0" role="note" data-tooltip="Pin tools&#10;Right-click a tool to pin it to the bar. Right-click a shortcut in the bar to remove it."></span></h2><span class="panel-drag-hint" title="Drag to move"><ui_icon s_name="move" /></span>
+            <div class="panel-header"><h2><ui_icon s_name="tools" /> Tools <span class="ui-info" tabindex="0" role="note" data-tooltip="Pin tools&#10;Right-click a tool to pin it to the bar. Right-click a shortcut in the bar to remove it."></span></h2>
                 <button class="panel-close" aria-label="Close tools" title="Close tools" @click="f_close_tools(true)">×</button></div>
             <div class="panel-body">
                 <div class="toolbar-tools-groups">
@@ -144,7 +144,7 @@ let o_component__toolbar = {
             s_pin_notice: '',
             a_o_tool_group: [
                 { s_label: 'Capture', a_o_tool: [
-                    { s_panel: 'capture', s_icon: 'camera', s_label: 'Capture Image', s_title: 'Download the current camera frame' },
+                    { s_panel: 'capture', s_icon: 'capture_image', s_label: 'Capture Image', s_title: 'Download the current camera frame' },
                     { s_panel: 'scan', s_icon: 'scan', s_label: 'Scan', s_title: 'Define an area, focus and stitch images' },
                     { s_panel: 'record', s_icon: 'record', s_label: 'Time-lapse', s_title: 'Record images at intervals, at one or more positions' },
                     { s_panel: 'video', s_icon: 'video', s_label: 'Video', s_title: 'Record real-time video, bursts or pre-roll' },
@@ -360,8 +360,10 @@ let o_component__toolbar = {
         f_stop_recording: function() {
             f_recording_stop();
         },
-        f_on_webcam_change: function() {
+        f_on_webcam_change: function(o_evt) {
             f_save_setting__debounced('s_id__webcam_device', o_state.s_id__webcam_device);
+            // a list that keeps the focus keeps the keys W A S D Q E for itself
+            o_evt.target.blur();
         },
         f_open_setup: function() {
             if(o_state.o_panel_visibility.setup && o_state.b_flashing) return;

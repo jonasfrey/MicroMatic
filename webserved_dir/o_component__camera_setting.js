@@ -2,6 +2,7 @@ import { o_state, f_save_setting__debounced } from './index.js';
 import { f_apply_camera_resolution, f_apply_camera_setting, f_apply_camera_control, f_read_camera } from './o_camera.module.js';
 import { o_component__icon } from './o_component__icon.js';
 import { o_component__filter } from './o_component__filter.js';
+import { o_component__camera_select } from './o_component__camera_select.js';
 
 let a_o_exposure_time = [
     { s_label: '1/1000', n_val: 10 },
@@ -38,7 +39,7 @@ let a_o_resolution__generic = [
 // exposure markers, processing) below. draft layout, not drawn by hand yet.
 let o_component__camera_setting = {
     name: 'component-camera-setting',
-    components: { ui_icon: o_component__icon, o_component__filter },
+    components: { ui_icon: o_component__icon, o_component__filter, o_component__camera_select },
     template: `
         <div class="overlay-panel panel-camera-setting" :class="{ visible: o_state.o_panel_visibility.camera_setting }">
             <div class="panel-header">
@@ -47,7 +48,9 @@ let o_component__camera_setting = {
                 <button class="panel-close" @click="f_close">&times;</button>
             </div>
             <div class="panel-body">
-                <div v-if="!o_cam.b_active" class="camera-setting-placeholder">No camera stream active</div>
+                <!-- the camera is chosen here too: without one this window has nothing else to show -->
+                <o_component__camera_select />
+                <div v-if="!o_cam.b_active" class="camera-setting-placeholder">{{ o_state.o_error__webcam ? o_state.o_error__webcam.s_title : 'No camera stream active' }}</div>
                 <div v-else class="camera-setting-stack">
 
                     <div class="cam-setting-row" data-tooltip="Frame rate&#10;Frames per second delivered by the camera.">
