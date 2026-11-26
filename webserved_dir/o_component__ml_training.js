@@ -9,6 +9,7 @@ import { f_a_v__moved, f_s_date_time } from './smart_selector.module.js';
 import {
     o_ml,
     N_BYTE__FREE_WARN,
+    A_O_ORGANISATION__PREDEFINED,
     f_save_config,
     f_camera_changed,
     f_o_calibration__local,
@@ -70,8 +71,9 @@ import {
 // and "cancel" stops it without keeping an image.
 // Draft, not in a drawing yet: the model row with the base model that is
 // fine-tuned and the epochs, "live" / "done"
-// for a stored image opened from the image list, and the message in the middle
-// of the image while a capture or a detection is running.
+// for a stored image opened from the image list, the message in the middle
+// of the image while a capture or a detection is running, and the list of
+// predefined accounts in front of the login fields.
 
 let o_component__ml_training = {
     name: 'component-ml-training',
@@ -103,6 +105,15 @@ let o_component__ml_training = {
                 <button class="toolbar-toggle toolbar-icon" data-control-skip @click="f_logout" aria-label="Log out" data-tooltip="Log out"><ui_icon s_name="logout" /></button>
             </template>
             <form class="ml-login" v-else-if="o_ml.b_probed && o_ml.b_reachable" autocomplete="off" @submit.prevent="f_login">
+                <label class="toolbar-select" data-tooltip="Account · draft&#10;The accounts of the people who test the application. Choosing one logs it in.">
+                    <span aria-hidden="true">account</span><ui_icon s_name="user" /><ui_icon s_name="chevron" />
+                    <select id="ml-login-account" data-control-skip aria-label="Account" :disabled="o_ml.s_activity !== ''" @change="f_login__predefined">
+                        <option value="">account</option>
+                        <optgroup v-for="o_organisation in A_O_ORGANISATION__PREDEFINED" :key="o_organisation.s_name" :label="o_organisation.s_name">
+                            <option v-for="s_name__person in o_organisation.a_s_name__person" :key="s_name__person" :value="o_organisation.s_name + '/' + s_name__person">{{ s_name__person }}</option>
+                        </optgroup>
+                    </select>
+                </label>
                 <label class="ml-chip ml-chip--field" data-tooltip="Organisation&#10;1 to 40 characters: a-z, 0-9, _ and -&#10;A new name creates a new, empty organisation.">
                     <ui_icon s_name="organisation" />
                     <input id="ml-login-organisation" type="text" data-control-skip aria-label="Organisation" placeholder="organisation" v-model.trim="s_name__organisation" autocomplete="off" spellcheck="false" maxlength="40" />
@@ -300,6 +311,7 @@ let o_component__ml_training = {
             o_state: o_state,
             o_ml: o_ml,
             N_CNT__FOCUS_MAX: N_CNT__FOCUS_MAX,
+            A_O_ORGANISATION__PREDEFINED: A_O_ORGANISATION__PREDEFINED,
             s_name__person: '',
             s_name__organisation: '',
             b_class__creating: false,
@@ -509,6 +521,15 @@ let o_component__ml_training = {
         },
         f_login: async function() {
             if(await f_login(this.s_name__person, this.s_name__organisation)) this.s_name__person = '';
+        },
+        // an account of the list: its two names go into the fields and are logged in.
+        // "/" is in no name of an organisation or a person.
+        f_login__predefined: async function(o_evt) {
+            let s_value = o_evt.target.value;
+            o_evt.target.value = '';
+            if(s_value === '') return;
+            [this.s_name__organisation, this.s_name__person] = s_value.split('/');
+            await this.f_login();
         },
         f_logout: function() {
             if(confirm('Log out ' + o_ml.o_person.s_name + '?' + (f_b_view__held() ? ' The boxes on the camera image are lost.' : ''))) f_logout();

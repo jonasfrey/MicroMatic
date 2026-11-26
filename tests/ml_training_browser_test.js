@@ -1172,6 +1172,16 @@ Deno.test('ML Training window: from login to a trained model', async () => {
         await f_v_page(`await o_test.f_click('Close ML Training');`);
         assert.equal(await f_v_page(`return document.body.classList.contains('ml-docked') || !!o_test.f_el('.ml-dock');`), false);
         assert.equal(await f_v_page(`return document.querySelector('#webcamVideo').getBoundingClientRect().width;`), 1600);
+
+        // ── the login offers the accounts of the people who test the application: choosing one logs it in ──
+        assert.deepEqual(await f_v_page(`return [...o_test.f_el('#ml-login-account').querySelectorAll('optgroup')].map(el => [el.label, [...el.querySelectorAll('option')].map(el => el.textContent)]);`),
+            [['alpha_testers', ['jonas_frey', 'katja_habegger', 'manuel_franzini', 'petra_zahajska']]]);
+        await f_screenshot('8-login-account');
+        await f_v_page(`let el = o_test.f_el('#ml-login-account'); el.value = 'alpha_testers/manuel_franzini'; el.dispatchEvent(new Event('change', { bubbles: true }));
+            await o_test.f_wait(() => o_test.o_ml.o_person && !o_test.f_el('#ml-login-account') && o_test.o_ml.s_activity === '', 'logged in with a predefined account');`);
+        assert.equal(await f_v_page(`return o_test.f_s_bar();`), '{no slide} | alpha_testers | manuel_franzini');
+        // an organisation of its own: nothing of privat1 is in it
+        assert.equal(await f_v_page(`return o_test.o_ml.a_o_dataset.length;`), 0);
         await f_v_page(`o_test.f_check();`);
         await f_send('Browser.close');
     } finally {

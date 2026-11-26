@@ -3,6 +3,11 @@
 What changed in the app, newest first. Before 2026-10-25 the entries are taken
 from commit messages; commits titled only "updates" are not listed (see `git log`).
 
+## 2026-11-26
+
+**Login: predefined accounts**
+- In front of the login fields a list offers the accounts of the people who test the application: organisation `alpha_testers` with `jonas_frey`, `katja_habegger`, `manuel_franzini` and `petra_zahajska`. Choosing one logs it in. The list is `A_O_ORGANISATION__PREDEFINED` in `webserved_dir/o_ml.module.js`; organisation and person are created by their first login. Draft, not in a drawing yet.
+
 ## 2026-11-23
 
 **ML Training: the model that is fine-tuned**

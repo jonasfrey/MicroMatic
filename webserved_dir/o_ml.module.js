@@ -34,6 +34,11 @@ let N_RPM__FOCUS = 6;
 let N_MS__FOCUS_TIMEOUT = 30000;
 let N_MS__FOCUS_SETTLE = 350;
 let N_MS__REST_TIMEOUT = 3000;
+// the accounts the login offers: the people who test the application. like every
+// organisation and person they are created by their first login.
+let A_O_ORGANISATION__PREDEFINED = [
+    { s_name: 'alpha_testers', a_s_name__person: ['jonas_frey', 'katja_habegger', 'manuel_franzini', 'petra_zahajska'] },
+];
 
 let o_ml = reactive({
     // counts the changes of the size of the camera image: the video element is not reactive
@@ -1211,6 +1216,7 @@ export {
     o_ml,
     N_BYTE__FREE_WARN,
     N_BYTE__FREE_MIN,
+    A_O_ORGANISATION__PREDEFINED,
     f_save_config,
     f_camera_changed,
     f_o_calibration__local,
