@@ -3,6 +3,15 @@
 What changed in the app, newest first. Before 2026-10-25 the entries are taken
 from commit messages; commits titled only "updates" are not listed (see `git log`).
 
+## 2026-11-23
+
+**ML Training: the model that is fine-tuned**
+- The model row says exactly what "train" fine-tunes: a list to choose the base model, and under it the pretrained weights, their publisher, what they were trained on, the size of the network, the image size and the library with its installed version. The status of a training and the list of models name the base model too.
+- New base models next to YOLO11n: YOLOX-S (Megvii) and RF-DETR Nano, Small and Medium (Roboflow). Their libraries are installed into `./venv_yolo`; until then they are listed as "not installed" and cannot be trained.
+- The detection libraries install themselves: `deno task start`, `deno task install` and the `MicroMatic` entry of the desktop install what is missing, `deno task doctor` reports it. With everything in place the check takes a fraction of a second. `deno task install_ml` (before: `install_yolo`) is the step on its own; `deno task install --skip-ml` leaves it out.
+- Data server: `GET /api/model_base`, `s_name__model_base` in the train request, the job and the model (see `dataserver/readme_mgc.md`).
+- YOLOX-S and RF-DETR train on small copies of the images, written once per training: a 3840×2160 PNG decoded in full for every step kept the graphics card waiting. RF-DETR Nano, 50 epochs on 79 images: 5 min instead of 10. The working folder of an RF-DETR training no longer grows by half a GB every 10 epochs.
+
 ## 2026-11-14
 
 **AI tools moved to branch `_experimental_ki_tools`**

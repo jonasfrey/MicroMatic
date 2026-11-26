@@ -19,7 +19,7 @@ let s_index = `
     export const o_state = reactive({
         b_applied__setting: true,
         o_panel_visibility: { ml_training: false, scale: false, setup: false, slide_library: false },
-        o_ml_config: { n_id__dataset: 0, s_name__microscope: '', s_name__calibration: '', n_id__model: 0, n_epoch: 50 },
+        o_ml_config: { n_id__dataset: 0, s_name__microscope: '', s_name__calibration: '', n_id__model: 0, n_epoch: 50, s_name__model_base: '' },
         o_calibration: { n_um__per_px: 0, o_camera__scale: null },
         a_n_step__per_px: [0, 0, 0],
         o_motor__axis: { x: 0, y: 1, z: 2 },
@@ -316,7 +316,8 @@ Deno.test('ML Training window: from login to a trained model', async () => {
         } catch { return new Response('', { status: 404 }); }
     });
     let s_url__page = 'http://127.0.0.1:' + o_server__static.addr.port;
-    let o_server = await f_o_dataserver__start({ DATASERVER_A_S_ORIGIN__ALLOWED: s_url__page });
+    // the fake worker reports every detection library as installed, except this one
+    let o_server = await f_o_dataserver__start({ DATASERVER_A_S_ORIGIN__ALLOWED: s_url__page, FAKE_S_LIBRARY__MISSING: 'rfdetr' });
     let s_path__profile = await Deno.makeTempDir();
     let o_chrome, o_socket;
     try {
@@ -654,7 +655,7 @@ Deno.test('ML Training window: from login to a trained model', async () => {
         assert.equal(await f_v_page(`return o_test.f_s_bar();`), '0.52 µm/px | 2.5 · 2 px/step | {ceratium1} | privat1 | jonas');
         assert.equal(await f_v_page(`return o_test.f_el_button('capture').disabled;`), false);
         assert.deepEqual(await f_v_page(`return o_test.o_saved.o_ml_config;`),
-            { n_id__dataset: 1, s_name__microscope: 'Bresser Erudit', s_name__calibration: '10x', n_id__model: 0, n_epoch: 50 });
+            { n_id__dataset: 1, s_name__microscope: 'Bresser Erudit', s_name__calibration: '10x', n_id__model: 0, n_epoch: 50, s_name__model_base: 'yolo11n' });
 
         // ── the stage lies exactly on the live image and lets it through ──
         await f_v_page(`await o_test.f_wait(() => o_test.f_el('.ml-stage.ml-stage--live') && o_test.f_el('.ml-view'), 'stage on the live image');`);
@@ -953,13 +954,33 @@ Deno.test('ML Training window: from login to a trained model', async () => {
             await o_test.f_click('Close images');`);
         assert.equal((await f_a_o_image()).length, 4);
 
+        // ── the window says exactly which model "train" fine-tunes ──
+        let f_choose_model_base = (s_name) => f_v_page(`let el = o_test.f_el('#ml-model-base'); el.value = ${JSON.stringify(s_name)}; el.dispatchEvent(new Event('change', { bubbles: true }));
+            await o_test.f_wait(() => o_test.o_state.o_ml_config.s_name__model_base === ${JSON.stringify(s_name)}, 'base model chosen');`);
+        let f_a_v_model_base = () => f_v_page(`return [o_test.f_el('#ml-model-base').value, o_test.f_el('.ml-model-base').textContent, o_test.f_el_button('train').disabled, o_test.f_el_button('train').dataset.tooltip];`);
+        assert.deepEqual(await f_v_page(`return [...o_test.f_el('#ml-model-base').options].map(el => el.textContent);`),
+            ['YOLO11n', 'YOLOX-S', 'RF-DETR Nano · not installed', 'RF-DETR Small · not installed', 'RF-DETR Medium · not installed']);
+        assert.deepEqual(await f_a_v_model_base(), ['yolo11n', 'yolo11n.pt · Ultralytics · COCO, 80 classes · 2.6 M parameters · 640 px · ultralytics 1.2.3 · AGPL-3.0', false,
+            'Train\nFine-tune YOLO11n with the images marked as done. Needs at least 2 of them and 1 box.']);
+        // a base model whose library is missing cannot be trained, and the window says what to do
+        await f_choose_model_base('rfdetr_small');
+        assert.deepEqual(await f_a_v_model_base(), ['rfdetr_small', 'rf-detr-small.pth · Roboflow · COCO, 80 classes · 32.1 M parameters · 512 px · rfdetr not installed · Apache-2.0', true,
+            'Train\nRF-DETR Small is not installed. Run in a terminal: deno task install_ml']);
+        await f_choose_model_base('yolox_s');
+        assert.deepEqual(await f_a_v_model_base(), ['yolox_s', 'yolox_s.pth · Megvii · COCO, 80 classes · 9.0 M parameters · 640 px · yolox 1.2.3 · Apache-2.0', false,
+            'Train\nFine-tune YOLOX-S with the images marked as done. Needs at least 2 of them and 1 box.']);
+        await f_screenshot('6-model-base');
+
         // ── train: the dataset becomes a model ──
         await f_v_page(`await o_test.f_type('#ml-epoch', '3'); await o_test.f_click('train');
             await o_test.f_wait(() => o_test.o_ml.o_job?.s_status === 'done' && o_test.o_ml.a_o_model.length === 1, 'training done', 15000);`);
         let a_o_model = (await f_o_request(o_server, 'GET', '/api/model', { s_token })).v_body.a_o_model;
         assert.equal(a_o_model.length, 1);
         assert.equal(a_o_model[0].n_o_dataset_n_id, 1);
-        assert.equal(await f_v_page(`return o_test.f_el('.ml-dock .cockpit-footer > .cockpit-status').textContent;`), 'trained · 3/3');
+        // the chosen base model was fine-tuned: the model and the status say so
+        assert.equal(a_o_model[0].s_name__model_base, 'yolox_s');
+        assert.equal(await f_v_page(`return o_test.f_el('.ml-dock .cockpit-footer > .cockpit-status:not(.ml-model-base)').textContent;`), 'trained YOLOX-S · 3/3');
+        assert.equal(await f_v_page(`return o_test.o_saved.o_ml_config.s_name__model_base;`), 'yolox_s');
         assert.equal(await f_v_page(`return o_test.o_state.o_ml_config.n_id__model;`), a_o_model[0].n_id);
 
         // ── the model is chosen in a smart selector: its list says when it was made and with how many images ──
@@ -971,7 +992,7 @@ Deno.test('ML Training window: from login to a trained model', async () => {
         await f_v_page(`await o_test.f_click('Model list');`);
         let a_a_s_model = await f_a_a_s_model();
         assert.deepEqual([a_a_s_model.length, a_a_s_model[0][0], a_a_s_model[0][2]], [1, a_o_model[0].s_name, true]);
-        assert.match(a_a_s_model[0][1], /^\d{4}-\d{2}-\d{2} \d{2}:\d{2} · 4 images$/);
+        assert.match(a_a_s_model[0][1], /^YOLOX-S · \d{4}-\d{2}-\d{2} \d{2}:\d{2} · 4 images$/);
         await f_v_page(`await o_test.f_key('Escape');`);
         // edit: the model gets another name
         await f_v_page(`await o_test.f_update('model', 'ceratium v1'); await o_test.f_wait(() => o_test.o_ml.a_o_model[0].s_name === 'ceratium v1' && o_test.o_ml.s_activity === '', 'model renamed');`);
@@ -985,11 +1006,11 @@ Deno.test('ML Training window: from login to a trained model', async () => {
             o_transfer.items.add(new File(['FAKEMODEL weights'], 'from elsewhere.pt')); el.files = o_transfer.files; el.dispatchEvent(new Event('change', { bubbles: true }));
             await o_test.f_wait(() => o_test.o_ml.a_o_model.length === 2 && o_test.o_ml.s_activity === '', 'model uploaded');`);
         assert.equal(await f_v_page(`return o_test.f_el('.ml-model .smart-selector-value').textContent.trim();`), 'from elsewhere');
-        // with how many images an uploaded model was trained is not known
+        // with how many images an uploaded model was trained, and from which base model, is not known
         await f_v_page(`await o_test.f_click('Model list');`);
         a_a_s_model = await f_a_a_s_model();
         assert.deepEqual(a_a_s_model.map(a => [a[0], a[2]]), [['ceratium v1', false], ['from elsewhere', true]]);
-        assert.match(a_a_s_model[0][1], /^\d{4}-\d{2}-\d{2} \d{2}:\d{2} · 4 images$/);
+        assert.match(a_a_s_model[0][1], /^YOLOX-S · \d{4}-\d{2}-\d{2} \d{2}:\d{2} · 4 images$/);
         assert.match(a_a_s_model[1][1], /^\d{4}-\d{2}-\d{2} \d{2}:\d{2} · — images$/);
         await f_screenshot('7-model-list');
         // the model is at the lower edge of the window: its list opens upwards and stays inside the window

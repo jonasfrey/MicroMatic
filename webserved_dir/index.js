@@ -261,6 +261,8 @@ let o_state = reactive({
         s_name__calibration: '',
         n_id__model: 0,
         n_epoch: 50,
+        // the base model "train" fine-tunes; '' until the data server has listed them
+        s_name__model_base: '',
     },
 
     // scan

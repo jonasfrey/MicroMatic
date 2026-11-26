@@ -132,6 +132,8 @@ Deno.test('a task of deno.json becomes the arguments for deno, unless it needs a
     let a_s_arg__data = f_a_s_arg__task(o_task.dataserver);
     assert.deepEqual([a_s_arg__data[0], a_s_arg__data.at(-1), a_s_arg__data.includes('--allow-env=DATASERVER_*')], ['run', 'dataserver/dataserver_denojs.js', true]);
     assert.equal(o_task.launch, 'deno run -A launcher/launcher_denojs.js');
+    // the launcher runs this one before the servers
+    assert.deepEqual(f_a_s_arg__task(o_task.install_ml), ['run', '-A', 'dataserver/install_ml.js']);
 });
 
 Deno.test('the port of the application server: --port among its arguments, 8000 without', () => {
@@ -188,7 +190,14 @@ let s_server__stand_in = `
     if(Deno.args.includes('--fail')) setTimeout(() => { console.error('stand-in: out of luck'); Deno.exit(3); }, 400);
 `;
 
-Deno.test('the launcher starts both servers, starts them again when they run, and stops them', async () => {
+// a stand-in for the task that installs what is missing: says that it ran, and fails with --fail
+let s_install__stand_in = `
+    console.log('stand-in: installing');
+    Deno.writeTextFileSync('installed.txt', 'installed');
+    if(Deno.args.includes('--fail')) Deno.exit(1);
+`;
+
+Deno.test('the launcher installs what is missing, starts both servers, starts them again when they run, and stops them', async () => {
     let s_path__root = await Deno.realPath(await Deno.makeTempDir({ prefix: 'omm_launcher_' }));
     let n_port__app = f_n_port__free();
     let n_port__data = f_n_port__free();
@@ -209,24 +218,33 @@ Deno.test('the launcher starts both servers, starts them again when they run, an
     let f_s_pid = async n_port => await (await fetch('http://127.0.0.1:' + n_port)).text();
     let f_b_running = async () => (await f_b_port__open(n_port__app)) && (await f_b_port__open(n_port__data));
     let f_b_stopped = async () => !(await f_b_port__open(n_port__app)) && !(await f_b_port__open(n_port__data));
-    let f_write_task = (s_arg__app = '') => Deno.writeTextFile(s_path__root + '/deno.json', JSON.stringify({ tasks: {
+    let f_write_task = (s_arg__app = '', s_arg__install = '') => Deno.writeTextFile(s_path__root + '/deno.json', JSON.stringify({ tasks: {
+        install_ml: 'deno run -A install_stand_in.js' + s_arg__install,
         server: `deno run -A stand_in.js --port ${n_port__app}${s_arg__app}`,
         dataserver: 'deno run -A stand_in.js --tidy',
     } }));
     try {
         await Deno.writeTextFile(s_path__root + '/stand_in.js', s_server__stand_in);
+        await Deno.writeTextFile(s_path__root + '/install_stand_in.js', s_install__stand_in);
         await f_write_task();
 
-        // ── start ──
+        // ── start: what is missing is installed first, in the folder of the checkout ──
         let o_launcher__1 = f_o_launcher();
         await f_wait(f_b_running, 'both servers');
         await f_wait(() => o_launcher__1.s_output.includes('started.'), 'the launcher says so');
+        assert.equal(await Deno.readTextFile(s_path__root + '/installed.txt'), 'installed');
+        assert.ok(o_launcher__1.s_output.indexOf('stand-in: installing') !== -1
+            && o_launcher__1.s_output.indexOf('stand-in: installing') < o_launcher__1.s_output.indexOf('started.'), o_launcher__1.s_output);
+        assert.equal(o_launcher__1.s_output.includes('not everything could be installed'), false, o_launcher__1.s_output);
         assert.ok(o_launcher__1.s_output.includes(`http://localhost:${n_port__app}`) && o_launcher__1.s_output.includes(`http://127.0.0.1:${n_port__data}`), o_launcher__1.s_output);
         let a_s_pid__1 = [await f_s_pid(n_port__app), await f_s_pid(n_port__data)];
 
         // ── start again: the running servers are stopped, new ones answer, the first launcher ends by itself ──
+        // an install that fails is said, and does not keep the servers from starting
+        await f_write_task('', ' --fail');
         let o_launcher__2 = f_o_launcher();
         await f_wait(() => o_launcher__2.s_output.includes('started again.'), 'the second launcher has taken over');
+        assert.ok(o_launcher__2.s_output.includes('not everything could be installed'), o_launcher__2.s_output);
         let a_s_pid__2 = [await f_s_pid(n_port__app), await f_s_pid(n_port__data)];
         assert.ok(a_s_pid__2[0] !== a_s_pid__1[0] && a_s_pid__2[1] !== a_s_pid__1[1], 'both servers are new processes');
         let o_status__1 = await o_launcher__1.o_process.status;

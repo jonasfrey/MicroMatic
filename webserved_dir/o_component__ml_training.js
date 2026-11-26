@@ -41,6 +41,7 @@ import {
     f_s_url__thumbnail,
     f_export,
     f_b_job__active,
+    f_o_model_base,
     f_train,
     f_cancel_train,
     f_upload_model,
@@ -67,7 +68,8 @@ import {
 // A capture with several focus points takes a while: the middle of the live
 // image says which focus point is being taken, no motor can be moved by hand,
 // and "cancel" stops it without keeping an image.
-// Draft, not in a drawing yet: the model row with epochs, "live" / "done"
+// Draft, not in a drawing yet: the model row with the base model that is
+// fine-tuned and the epochs, "live" / "done"
 // for a stored image opened from the image list, and the message in the middle
 // of the image while a capture or a detection is running.
 
@@ -245,13 +247,21 @@ let o_component__ml_training = {
                         <input ref="el_file__model" class="sr-only" type="file" accept=".pt" data-control-skip tabindex="-1" aria-label="Upload model" @change="f_on_model_file" />
                         <button class="btn-small" @click="f_detect" :disabled="!o_state.o_ml_config.n_id__model || o_ml.s_activity !== ''" aria-label="detect objects"
                             data-tooltip="Detect objects&#10;Apply the chosen model to the image. What it finds is shown dashed and is never saved. On the live image it goes as soon as X or Y moves."><ui_icon s_name="detection" /> detect objects</button>
+                        <div class="cockpit-field" :data-tooltip="s_tooltip__model_base">
+                            <label for="ml-model-base">fine-tune</label>
+                            <select id="ml-model-base" data-control-skip aria-label="Model to fine-tune" :disabled="b_job_active"
+                                v-model="o_state.o_ml_config.s_name__model_base" @change="f_save_config">
+                                <option v-for="o_model_base in o_ml.a_o_model_base" :key="o_model_base.s_name" :value="o_model_base.s_name">{{ o_model_base.s_label }}{{ o_model_base.s_version__library ? '' : ' · not installed' }}</option>
+                            </select>
+                        </div>
+                        <div class="cockpit-status ml-model-base" role="note" v-if="o_model_base">{{ s_detail__model_base }}</div>
                         <div class="cockpit-row">
                             <div class="cockpit-field ml-field--epoch" data-tooltip="Epochs&#10;How many times the training goes through all images.">
                                 <label for="ml-epoch">epochs</label>
                                 <input id="ml-epoch" type="number" data-control-skip min="1" max="1000" step="1" v-model.number="o_state.o_ml_config.n_epoch" @change="f_on_epoch_change" />
                             </div>
-                            <button class="btn-small cockpit-grow" v-if="!b_job_active" @click="f_train" :disabled="o_ml.s_activity !== ''" aria-label="train"
-                                data-tooltip="Train&#10;Train a new model from the images marked as done. Needs at least 2 of them and 1 box."><ui_icon s_name="ml_brain_gear" /> train</button>
+                            <button class="btn-small cockpit-grow" v-if="!b_job_active" @click="f_train" :disabled="o_ml.s_activity !== '' || !b_model_base__installed" aria-label="train"
+                                :data-tooltip="s_tooltip__train"><ui_icon s_name="ml_brain_gear" /> train</button>
                             <button class="btn-small cockpit-grow" v-else @click="f_cancel_train" aria-label="cancel training" data-tooltip="Cancel the running training"><ui_icon s_name="stop" /> cancel</button>
                         </div>
                         <div class="cockpit-status" :class="s_class__job" role="status" v-if="s_status__job">{{ s_status__job }}</div>
@@ -413,14 +423,54 @@ let o_component__ml_training = {
         b_job_active: function() {
             return f_b_job__active();
         },
+        // the base model "train" fine-tunes, null until the data server has listed them
+        o_model_base: function() {
+            return f_o_model_base(o_state.o_ml_config.s_name__model_base);
+        },
+        b_model_base__installed: function() {
+            return !!this.o_model_base && !!this.o_model_base.s_version__library;
+        },
+        // exactly what is fine-tuned: the weights, who published them, what they were trained on,
+        // how large the network is, the image it is trained with, and the library that trains it
+        s_detail__model_base: function() {
+            let o_model_base = this.o_model_base;
+            if(!o_model_base) return '';
+            return [
+                o_model_base.s_name_file__weight,
+                o_model_base.s_publisher,
+                o_model_base.s_pretrained,
+                (o_model_base.n_cnt__parameter / 1e6).toFixed(1) + ' M parameters',
+                o_model_base.n_px__image + ' px',
+                o_model_base.s_library + ' ' + (o_model_base.s_version__library || 'not installed'),
+                o_model_base.s_license,
+            ].join(' · ');
+        },
+        s_tooltip__model_base: function() {
+            let o_model_base = this.o_model_base;
+            let s_tooltip = 'Fine-tune\nThe pretrained model a training starts from. The trained model keeps its kind and is applied the same way.';
+            if(o_model_base && !o_model_base.s_version__library){
+                s_tooltip += '\n' + o_model_base.s_label + ' is not installed. Run in a terminal: deno task install_ml';
+            }
+            return s_tooltip;
+        },
+        s_tooltip__train: function() {
+            let o_model_base = this.o_model_base;
+            if(o_model_base && !o_model_base.s_version__library){
+                return 'Train\n' + o_model_base.s_label + ' is not installed. Run in a terminal: deno task install_ml';
+            }
+            return 'Train\nFine-tune ' + (o_model_base ? o_model_base.s_label : 'the chosen model')
+                + ' with the images marked as done. Needs at least 2 of them and 1 box.';
+        },
         s_status__job: function() {
             let o_job = o_ml.o_job;
             if(!o_job) return '';
-            if(o_job.s_status === 'preparing') return 'training · preparing';
-            if(o_job.s_status === 'running') return 'training · ' + o_job.n_epoch + '/' + o_job.n_epoch__total;
-            if(o_job.s_status === 'done') return 'trained · ' + o_job.n_epoch__total + '/' + o_job.n_epoch__total;
-            if(o_job.s_status === 'cancelled') return 'training cancelled';
-            return 'training failed';
+            // the job says itself what it fine-tunes: the choice in the window may have changed since
+            let s_label = this.f_s_label__model_base(o_job.s_name__model_base);
+            if(o_job.s_status === 'preparing') return 'training ' + s_label + ' · preparing';
+            if(o_job.s_status === 'running') return 'training ' + s_label + ' · ' + o_job.n_epoch + '/' + o_job.n_epoch__total;
+            if(o_job.s_status === 'done') return 'trained ' + s_label + ' · ' + o_job.n_epoch__total + '/' + o_job.n_epoch__total;
+            if(o_job.s_status === 'cancelled') return 'training ' + s_label + ' cancelled';
+            return 'training ' + s_label + ' failed';
         },
         s_class__job: function() {
             let o_job = o_ml.o_job;
@@ -588,12 +638,19 @@ let o_component__ml_training = {
             o_state.o_ml_config.n_epoch = Math.min(Math.max(n_epoch || 1, 1), 1000);
             f_save_config();
         },
-        // the second line of a model in its list: when it was made, and with how many images it was trained
+        // how the window names a base model; a name the data server does not list stands for itself
+        f_s_label__model_base: function(s_name) {
+            let o_model_base = f_o_model_base(s_name);
+            return o_model_base ? o_model_base.s_label : s_name;
+        },
+        // the second line of a model in its list: what it was fine-tuned from, when it was made,
+        // and with how many images it was trained
         f_s_detail__model: function(o_model) {
             let n_cnt = o_model.n_cnt__image;
             // a model that was uploaded, or trained before the number was stored
             let b_known = Number.isInteger(n_cnt);
-            return f_s_date_time(o_model.n_ts_ms__created) + ' · ' + (b_known ? n_cnt : '—') + (n_cnt === 1 ? ' image' : ' images');
+            return (o_model.s_name__model_base ? this.f_s_label__model_base(o_model.s_name__model_base) + ' · ' : '')
+                + f_s_date_time(o_model.n_ts_ms__created) + ' · ' + (b_known ? n_cnt : '—') + (n_cnt === 1 ? ' image' : ' images');
         },
         f_select_model: function(o_model) {
             f_select_model(o_model.n_id);

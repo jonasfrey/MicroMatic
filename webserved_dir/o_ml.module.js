@@ -50,6 +50,8 @@ let o_ml = reactive({
     a_o_class: [],
     a_o_image: [],
     a_o_model: [],
+    // what a training can start from, as the data server lists it (dataserver/model_base.module.js)
+    a_o_model_base: [],
     a_o_microscope: [],
     // the slides the data server knows, each with o_image__last (see f_refresh_slide_list)
     a_o_slide__server: [],
@@ -242,6 +244,7 @@ let f_clear_session = function(){
     o_ml.a_o_class = [];
     o_ml.a_o_image = [];
     o_ml.a_o_model = [];
+    o_ml.a_o_model_base = [];
     o_ml.a_o_microscope = [];
     o_ml.a_o_slide__server = [];
     o_ml.o_job = null;
@@ -253,14 +256,20 @@ let f_clear_session = function(){
 f_set_on_session_lost(f_clear_session);
 
 let f_load_organisation = async function(){
-    let [o_dataset, o_model, o_microscope, o_train] = await Promise.all([
+    let [o_dataset, o_model, o_model_base, o_microscope, o_train] = await Promise.all([
         f_v_api('GET', '/api/dataset'),
         f_v_api('GET', '/api/model'),
+        f_v_api('GET', '/api/model_base'),
         f_v_api('GET', '/api/microscope'),
         f_v_api('GET', '/api/train'),
     ]);
     o_ml.a_o_dataset = o_dataset.a_o_dataset;
     o_ml.a_o_model = o_model.a_o_model;
+    o_ml.a_o_model_base = o_model_base.a_o_model_base;
+    // the base model chosen last time, when the data server still offers it
+    if(!f_o_model_base(o_state.o_ml_config.s_name__model_base)){
+        o_state.o_ml_config.s_name__model_base = o_model_base.s_name__default;
+    }
     o_ml.a_o_microscope = o_microscope.a_o_microscope;
     o_ml.o_job = o_train.o_job;
     if(!o_ml.a_o_model.some(function(o){ return o.n_id === o_state.o_ml_config.n_id__model; })){
@@ -1075,6 +1084,11 @@ let f_export = async function(){
 
 let n_id__timeout__job = 0;
 
+// the base model with this name, null when the data server does not list it
+let f_o_model_base = function(s_name){
+    return o_ml.a_o_model_base.find(function(o_model_base){ return o_model_base.s_name === s_name; }) || null;
+};
+
 let f_b_job__active = function(){
     return !!o_ml.o_job && (o_ml.o_job.s_status === 'preparing' || o_ml.o_job.s_status === 'running');
 };
@@ -1104,7 +1118,9 @@ let f_train = async function(){
     if(!o_dataset) return false;
     return await f_b_run('train', 'Starting the training', async function(){
         await f_save_bbox__now();
-        let o_result = await f_v_api('POST', `/api/dataset/${o_dataset.n_id}/train`, { v_json: { n_epoch: o_state.o_ml_config.n_epoch } });
+        let o_result = await f_v_api('POST', `/api/dataset/${o_dataset.n_id}/train`, {
+            v_json: { n_epoch: o_state.o_ml_config.n_epoch, s_name__model_base: o_state.o_ml_config.s_name__model_base },
+        });
         o_ml.o_job = o_result.o_job;
         f_watch_job();
     });
@@ -1241,6 +1257,7 @@ export {
     f_s_url__thumbnail,
     f_export,
     f_b_job__active,
+    f_o_model_base,
     f_train,
     f_cancel_train,
     f_upload_model,

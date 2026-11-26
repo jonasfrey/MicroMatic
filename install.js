@@ -10,6 +10,8 @@
 //   desktop entry (linux only)                    ->  "MicroMatic" in the application menu and as an icon on
 //                                                     the desktop starts or restarts the application and the
 //                                                     data server
+//   ./venv_yolo with ultralytics, yolox, rfdetr   ->  ML Training window: training and prediction of the
+//                                                     data server (dataserver/install_ml.js)
 //
 // every step is idempotent: already satisfied steps are skipped, so this is safe
 // to run on every `deno task start`.
@@ -48,6 +50,7 @@ let b_skip_python = a_s_arg.includes('--skip-python');
 let b_skip_stitch_ai = a_s_arg.includes('--skip-stitch-ai');
 let b_verify_compile = a_s_arg.includes('--verify-compile');
 let b_skip_desktop = a_s_arg.includes('--skip-desktop');
+let b_skip_ml = a_s_arg.includes('--skip-ml');
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -549,6 +552,19 @@ let f_setup_desktop = async function() {
     await f_write_desktop_entry(s_path__icon, s_entry, 'on the desktop', true);
 };
 
+// ─── Step: detection libraries of the ML Training window ───────────
+// an installer of its own, so the launcher can run it alone before it starts
+// the servers. it prints its own lines; the last step here, because its first
+// run downloads a few GB.
+
+let f_setup_ml = async function() {
+    let a_s_arg__ml = ['run', '-A', `${s_root_dir}${s_ds}dataserver${s_ds}install_ml.js`];
+    if (b_check_only) a_s_arg__ml.push('--check');
+    if (!await f_b_run_live(Deno.execPath(), a_s_arg__ml)) {
+        a_s_problem.push('detection libraries of the ML Training window');
+    }
+};
+
 // ─── Run ────────────────────────────────────────────────────────────
 
 console.log(`
@@ -563,6 +579,7 @@ await f_setup_v4l2();
 await f_check_serial();
 await f_check_browser();
 if (!b_skip_desktop) await f_setup_desktop();
+if (!b_skip_ml) await f_setup_ml();
 
 if (a_s_problem.length === 0) {
     console.log('\n  ✓ everything is ready\n');

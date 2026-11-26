@@ -4,15 +4,20 @@
 // starts the application server and the data server in this terminal and opens
 // the application in the browser. servers of this checkout that are running
 // already are stopped first: starting again is a restart.
+// before the servers start, what the data server needs for training and
+// prediction is installed when it is missing (the task "install_ml").
 // closing the terminal window or Ctrl+C stops both.
 //
 //   --no-browser     do not open the browser
-//   --root <folder>  the checkout whose tasks "server" and "dataserver" are started
-//                    (default: the checkout this file lies in)
+//   --root <folder>  the checkout whose tasks "install_ml", "server" and "dataserver"
+//                    are run (default: the checkout this file lies in)
 
 import { f_o_config } from '../dataserver/config.module.js';
 import { A_S_NAME__BROWSER, f_a_s_arg__task, f_n_port__app, f_a_n_pid__listening } from './launcher.module.js';
 
+// run before the servers start. with everything in place it only reads what is
+// installed and is done in a moment, so every start can afford it.
+let S_NAME__TASK__INSTALL = 'install_ml';
 let N_MS__START_TIMEOUT = 120 * 1000;
 let N_MS__STOP_TIMEOUT = 5 * 1000;
 let N_MS__POLL = 150;
@@ -33,9 +38,12 @@ let f_sleep = function(n_ms){
 
 // ─── Which servers ──────────────────────────────────────────────────
 
+let f_o_task = async function(){
+    return JSON.parse(await Deno.readTextFile(s_path__root + '/deno.json')).tasks || {};
+};
+
 // the tasks the servers are started with by hand are the ones started here
-let f_a_o_server = async function(){
-    let o_task = JSON.parse(await Deno.readTextFile(s_path__root + '/deno.json')).tasks || {};
+let f_a_o_server = function(o_task){
     let f_a_s_arg = function(s_name__task){
         let a_s_arg = f_a_s_arg__task(o_task[s_name__task]);
         if(!a_s_arg) throw new Error(`The task "${s_name__task}" of deno.json is missing or is more than one plain deno command. The launcher cannot start it.`);
@@ -149,6 +157,24 @@ let f_open_browser = async function(s_url){
     }
 };
 
+// ─── Install ────────────────────────────────────────────────────────
+
+// run the install task of the checkout and wait for it. a checkout without
+// one is started as it is. what could not be installed does not keep the
+// servers from starting: the application says which model cannot be trained.
+let f_install = async function(o_task, s_path){
+    let a_s_arg = f_a_s_arg__task(o_task[S_NAME__TASK__INSTALL]);
+    if(!a_s_arg) return;
+    let b_success = false;
+    try {
+        b_success = (await new Deno.Command(Deno.execPath(), {
+            args: a_s_arg, cwd: s_path__root, env: { PATH: s_path }, stdin: 'null', stdout: 'inherit', stderr: 'inherit',
+        }).spawn().status).success;
+    } catch { /* said below */ }
+    if(!b_success) f_log('not everything could be installed, see above. the servers are started all the same.');
+    console.log('');
+};
+
 // ─── Run ────────────────────────────────────────────────────────────
 
 let a_o_process = [];
@@ -173,11 +199,13 @@ let f_exit = async function(n_code, s_message){
 let f_run = async function(){
     if(Deno.stdout.isTerminal()) await Deno.stdout.write(new TextEncoder().encode('\x1b]0;MicroMatic\x07'));
     console.log('\n  MicroMatic\n');
-    let a_o_server = await f_a_o_server();
+    let o_task = await f_o_task();
+    let a_o_server = f_a_o_server(o_task);
     let b_restart = await f_b_stop_running(a_o_server);
 
     // the servers find deno and what the installer put next to it, also when the desktop started this
     let s_path = [Deno.execPath().replace(/\/[^/]*$/, ''), Deno.env.get('PATH') || ''].join(':');
+    await f_install(o_task, s_path);
     let a_o_end = [];
     for(let o_server of a_o_server){
         let o_process = new Deno.Command(Deno.execPath(), {

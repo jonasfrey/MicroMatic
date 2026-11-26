@@ -47,6 +47,17 @@ Installed into `./venv` by `deno task install`.
 | NetworkX, SymPy, Jinja2, MarkupSafe, ContourPy, cycler, fontTools, kiwisolver, mpmath, fsspec, filelock, packaging, pyparsing, python-dateutil, six, typing_extensions | transitive dependencies of the above | BSD / MIT / Apache-2.0 |
 | `m2stitch` | optional, only used by the `test_m2stitch.py` comparison script | see the package metadata |
 
+Installed into `./venv_yolo` by `deno task install_ml`, for training and
+prediction of the data server (`dataserver/yolo_worker.py`). The pretrained
+weights are downloaded at the first training, not redistributed here.
+
+| component | use | licence |
+| --- | --- | --- |
+| [Ultralytics](https://github.com/ultralytics/ultralytics) | YOLO11n: training and prediction; pretrained weights `yolo11n.pt` | AGPL-3.0 |
+| [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) (Megvii) | YOLOX-S: network, loss and augmentation; pretrained weights `yolox_s.pth` | Apache-2.0 |
+| [RF-DETR](https://github.com/roboflow/rf-detr) (Roboflow) | RF-DETR Nano, Small, Medium: training and prediction; pretrained weights `rf-detr-*.pth` | Apache-2.0 |
+| PyTorch / torchvision, loguru, pycocotools, PyTorch Lightning, transformers, supervision and further transitive dependencies | required by the three libraries above | BSD / MIT / Apache-2.0, see the package metadata |
+
 Note: LightGlue downloads the pretrained **SuperPoint** weights at runtime into
 PyTorch's cache. Those weights originate from Magic Leap's SuperPoint release;
 they are fetched by the dependency, not redistributed in this repository. Review
