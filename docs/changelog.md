@@ -5,6 +5,10 @@ from commit messages; commits titled only "updates" are not listed (see `git log
 
 ## 2026-11-26
 
+**Detection libraries: a python that is new enough**
+- `./venv_yolo` is created with the first `python3` of the PATH that is new enough for the detection libraries (`a_n_version__python__min` in `dataserver/install_ml.js`). Before, it was created with the first `python3` of the PATH whatever its version: with an older Anaconda in front of the python of the system only Ultralytics could be installed, and YOLOX and RF-DETR stayed "not installed".
+- An environment built on a python that is too old is built again by the next `deno task start`; `deno task doctor` names it.
+
 **Login: predefined accounts**
 - In front of the login fields a list offers the accounts of the people who test the application: organisation `alpha_testers` with `jonas_frey`, `katja_habegger`, `manuel_franzini` and `petra_zahajska`. Choosing one logs it in. The list is `A_O_ORGANISATION__PREDEFINED` in `webserved_dir/o_ml.module.js`; organisation and person are created by their first login. Draft, not in a drawing yet.
 
