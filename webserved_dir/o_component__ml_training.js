@@ -95,7 +95,7 @@ let o_component__ml_training = {
                     <ui_icon s_name="motor" /><span>{{ s_px_per_step }}</span></button>
             </template>
             <ml_slide />
-            <span class="ml-chip warning" v-if="o_ml.b_probed && !o_ml.b_reachable" data-tooltip="Data server offline&#10;Start it in a terminal with: deno task dataserver">
+            <span class="ml-chip warning" v-if="o_ml.b_probed && !o_ml.b_reachable" data-tooltip="Data server offline&#10;Start it in a terminal with: deno task launch">
                 <ui_icon s_name="database" /><span>offline</span></span>
             <template v-if="o_ml.o_person">
                 <span class="ml-chip ml-chip--name" :data-tooltip="'Organisation · ' + o_ml.o_organisation.s_name + '\\nAll datasets, slides and models belong to it.'">
@@ -134,7 +134,7 @@ let o_component__ml_training = {
             </div>
             <div class="ml-dock-body">
                 <p class="cockpit-status error" role="alert" v-if="o_ml.b_probed && !o_ml.b_reachable"
-                    data-tooltip="Data server offline&#10;Start it in a terminal with: deno task dataserver">data server offline</p>
+                    data-tooltip="Data server offline&#10;Start it in a terminal with: deno task launch">data server offline</p>
                 <p class="cockpit-status" role="status" v-else-if="o_ml.b_probed && !o_ml.o_person"
                     data-tooltip="Not logged in&#10;Enter organisation and name in the top bar.">not logged in</p>
                 <p class="cockpit-status warning" role="status" v-else-if="b_disk_low"
@@ -461,14 +461,14 @@ let o_component__ml_training = {
             let o_model_base = this.o_model_base;
             let s_tooltip = 'Fine-tune\nThe pretrained model a training starts from. The trained model keeps its kind and is applied the same way.';
             if(o_model_base && !o_model_base.s_version__library){
-                s_tooltip += '\n' + o_model_base.s_label + ' is not installed. Run in a terminal: deno task install_ml';
+                s_tooltip += '\n' + o_model_base.s_label + ' is not installed. Run in MicroMatic_Server: deno task install';
             }
             return s_tooltip;
         },
         s_tooltip__train: function() {
             let o_model_base = this.o_model_base;
             if(o_model_base && !o_model_base.s_version__library){
-                return 'Train\n' + o_model_base.s_label + ' is not installed. Run in a terminal: deno task install_ml';
+                return 'Train\n' + o_model_base.s_label + ' is not installed. Run in MicroMatic_Server: deno task install';
             }
             return 'Train\nFine-tune ' + (o_model_base ? o_model_base.s_label : 'the chosen model')
                 + ' with the images marked as done. Needs at least 2 of them and 1 box.';

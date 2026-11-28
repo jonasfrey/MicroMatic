@@ -12,8 +12,8 @@ __pycache__/
 
 training_data/
 
+# the old place of the data server, now MicroMatic_Server: its python environment,
+# database, images, models and protocol stay ignored until they are moved there
 venv_yolo/
-
-# data server: database, images, models and protocol
 dataserver/data/
 dataserver/log/

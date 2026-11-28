@@ -1,7 +1,7 @@
 // Every call from the browser to the data server goes through this module.
 // It knows the address, sends the token of the session and turns a failed
 // call into an error with a message that says what to do.
-// The API is described in dataserver/readme_mgc.md.
+// The API is described in readme_mgc.md of MicroMatic_Server.
 
 let s_key__token = 'omm.dataserver.s_token';
 let s_key__url = 'omm.dataserver.s_url';
@@ -67,7 +67,7 @@ let f_v_response__dataserver = async function(s_method, s_path, o_option = {}){
     try {
         o_response = await fetch(f_s_url__dataserver() + s_path, { method: s_method, headers: o_header, body: v_body });
     } catch {
-        throw f_o_error__dataserver(0, 'not_reachable', 'The data server is not reachable. Start it with: deno task dataserver');
+        throw f_o_error__dataserver(0, 'not_reachable', 'The data server is not reachable. Start it with: deno task launch');
     }
     if(!o_response.ok){
         let o_body = {};

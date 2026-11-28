@@ -10,8 +10,9 @@
 //   desktop entry (linux only)                    ->  "MicroMatic" in the application menu and as an icon on
 //                                                     the desktop starts or restarts the application and the
 //                                                     data server
-//   ./venv_yolo with ultralytics, yolox, rfdetr   ->  ML Training window: training and prediction of the
-//                                                     data server (dataserver/install_ml.js)
+//   ./venv_yolo of MicroMatic_Server              ->  ML Training window: training and prediction of the
+//                                                     data server (install_ml.js there), when its checkout
+//                                                     is found (micromatic_server.module.js)
 //
 // every step is idempotent: already satisfied steps are skipped, so this is safe
 // to run on every `deno task start`.
@@ -22,6 +23,7 @@ import {
 } from "./runtimedata.module.js";
 import { f_generate_ino } from './flash_functions.module.js';
 import { f_s_path__desktop_entry, f_s_path__desktop_icon, f_s_desktop_entry, f_b_chromium_snap__usb, A_S_NAME__BROWSER } from './launcher/launcher.module.js';
+import { f_o_checkout__server } from './micromatic_server.module.js';
 
 // ─── Paths ──────────────────────────────────────────────────────────
 
@@ -553,12 +555,19 @@ let f_setup_desktop = async function() {
 };
 
 // ─── Step: detection libraries of the ML Training window ───────────
-// an installer of its own, so the launcher can run it alone before it starts
-// the servers. it prints its own lines; the last step here, because its first
-// run downloads a few GB.
+// the installer of MicroMatic_Server, which the launcher also runs alone before
+// it starts the servers. it prints its own lines; the last step here, because
+// its first run downloads a few GB. without the server checkout it is skipped:
+// everything but the ML Training window works without it.
 
 let f_setup_ml = async function() {
-    let a_s_arg__ml = ['run', '-A', `${s_root_dir}${s_ds}dataserver${s_ds}install_ml.js`];
+    let o_checkout__server = f_o_checkout__server(s_root_dir);
+    if (!o_checkout__server.b_found) {
+        f_log_step('Detection libraries (ML Training: training and prediction of the data server)');
+        f_log_todo(`skipped: no MicroMatic_Server in ${o_checkout__server.s_path}. the ML Training window needs it next to this checkout`);
+        return;
+    }
+    let a_s_arg__ml = ['run', '-A', `${o_checkout__server.s_path}${s_ds}install_ml.js`];
     if (b_check_only) a_s_arg__ml.push('--check');
     if (!await f_b_run_live(Deno.execPath(), a_s_arg__ml)) {
         a_s_problem.push('detection libraries of the ML Training window');

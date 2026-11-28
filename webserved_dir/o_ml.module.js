@@ -55,7 +55,7 @@ let o_ml = reactive({
     a_o_class: [],
     a_o_image: [],
     a_o_model: [],
-    // what a training can start from, as the data server lists it (dataserver/model_base.module.js)
+    // what a training can start from, as the data server lists it (model_base.module.js of MicroMatic_Server)
     a_o_model_base: [],
     a_o_microscope: [],
     // the slides the data server knows, each with o_image__last (see f_refresh_slide_list)

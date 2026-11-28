@@ -3,6 +3,15 @@
 What changed in the app, newest first. Before 2026-10-25 the entries are taken
 from commit messages; commits titled only "updates" are not listed (see `git log`).
 
+## 2026-11-28
+
+**Data server: a program of its own, MicroMatic Server**
+- The data server of the ML Training window left this repository. It is MicroMatic Server, a separate proprietary program in a checkout of its own; the window talks to it over HTTP as before.
+- `deno task launch` and the `MicroMatic` entry start it from `../MicroMatic_Server` (another folder: `MICROMATIC_S_PATH__SERVER`, or `--server-root`) and run its `deno task install` first. Without it they start the application alone and say so. `deno task install` runs its installer the same way, or skips it (`micromatic_server.module.js`).
+- The tasks `dataserver` and `install_ml` are gone; `test_dataserver` is now `test_ml` with the tests of the window only. The ML Training window test takes the data server from the server checkout and is ignored without one.
+- YOLO11n (Ultralytics, AGPL-3.0) is no longer offered; the default base model is RF-DETR Nano.
+- `dataserver/data/`, `dataserver/log/` and `venv_yolo/` stay git-ignored until they are moved to MicroMatic Server.
+
 ## 2026-11-26
 
 **Detection libraries: a python that is new enough**

@@ -1,11 +1,13 @@
-// The launcher: the desktop entry that install.js writes, and starting,
-// restarting and stopping the two servers. The servers are replaced by small
-// stand-ins in a temporary checkout; no browser is opened.
+// The launcher: the desktop entry that install.js writes, where MicroMatic_Server
+// is found, and starting, restarting and stopping the two servers. The servers
+// are replaced by small stand-ins in temporary checkouts of MicroMatic and
+// MicroMatic_Server; no browser is opened.
 import assert from 'node:assert/strict';
 import {
     f_s_path__desktop_entry, f_s_arg__exec, f_s_desktop_entry, f_a_s_arg__task, f_n_port__app, f_a_n_pid__listening,
     f_s_path__desktop_icon, f_b_chromium_snap__usb,
 } from '../launcher/launcher.module.js';
+import { S_NAME__ENV__PATH__SERVER, f_o_checkout__server, f_s_url__file } from '../micromatic_server.module.js';
 
 let s_path__repository = decodeURIComponent(new URL('..', import.meta.url).pathname).replace(/\/$/, '');
 
@@ -126,14 +128,51 @@ Deno.test('a task of deno.json becomes the arguments for deno, unless it needs a
     for(let s_task of ['deno run -A install.js && deno run -A webserver_denojs.js', 'deno run "a b.js"', 'FOO=1 deno run x.js', 'deno run x.js > log', 'deno run $HOME/x.js', 'node x.js', 'deno', undefined]){
         assert.equal(f_a_s_arg__task(s_task), null, String(s_task));
     }
-    // the two tasks the launcher starts are plain commands
+    // the task the launcher starts in this checkout is a plain command. the data server is no task of it any more
     let o_task = JSON.parse(await Deno.readTextFile(s_path__repository + '/deno.json')).tasks;
     assert.deepEqual(f_a_s_arg__task(o_task.server), ['run', '-A', 'webserver_denojs.js']);
-    let a_s_arg__data = f_a_s_arg__task(o_task.dataserver);
-    assert.deepEqual([a_s_arg__data[0], a_s_arg__data.at(-1), a_s_arg__data.includes('--allow-env=DATASERVER_*')], ['run', 'dataserver/dataserver_denojs.js', true]);
     assert.equal(o_task.launch, 'deno run -A launcher/launcher_denojs.js');
-    // the launcher runs this one before the servers
-    assert.deepEqual(f_a_s_arg__task(o_task.install_ml), ['run', '-A', 'dataserver/install_ml.js']);
+    assert.deepEqual([o_task.dataserver, o_task.install_ml], [undefined, undefined]);
+    // the two tasks of MicroMatic_Server it runs, "install" before the servers, when that checkout is there
+    let o_checkout__server = f_o_checkout__server(s_path__repository);
+    if(!o_checkout__server.b_found) return;
+    let o_task__data = JSON.parse(await Deno.readTextFile(o_checkout__server.s_path + '/deno.json')).tasks;
+    let a_s_arg__data = f_a_s_arg__task(o_task__data.start);
+    assert.deepEqual([a_s_arg__data[0], a_s_arg__data.at(-1), a_s_arg__data.includes('--allow-env=DATASERVER_*')], ['run', 'dataserver_denojs.js', true]);
+    assert.deepEqual(f_a_s_arg__task(o_task__data.install), ['run', '-A', 'install_ml.js']);
+});
+
+Deno.test('MicroMatic_Server is looked for next to the checkout, else where MICROMATIC_S_PATH__SERVER or the command line says', async () => {
+    let s_path__tmp = await Deno.realPath(await Deno.makeTempDir({ prefix: 'omm_launcher_' }));
+    let s_env__before = Deno.env.get(S_NAME__ENV__PATH__SERVER);
+    let f_write_checkout = async s_path => {
+        await Deno.mkdir(s_path, { recursive: true });
+        await Deno.writeTextFile(s_path + '/deno.json', '{}');
+        await Deno.writeTextFile(s_path + '/config.module.js', '');
+    };
+    try {
+        Deno.env.delete(S_NAME__ENV__PATH__SERVER);
+        let s_path__root = s_path__tmp + '/MicroMatic';
+        await Deno.mkdir(s_path__root);
+        assert.deepEqual(f_o_checkout__server(s_path__root), { s_path: s_path__tmp + '/MicroMatic_Server', b_found: false });
+        await f_write_checkout(s_path__tmp + '/MicroMatic_Server');
+        assert.deepEqual(f_o_checkout__server(s_path__root), { s_path: s_path__tmp + '/MicroMatic_Server', b_found: true });
+        // the environment variable comes before the folder next to it; a folder without the files of the server is none
+        await Deno.mkdir(s_path__tmp + '/empty');
+        Deno.env.set(S_NAME__ENV__PATH__SERVER, s_path__tmp + '/empty');
+        assert.deepEqual(f_o_checkout__server(s_path__root), { s_path: s_path__tmp + '/empty', b_found: false });
+        await f_write_checkout(s_path__tmp + '/elsewhere');
+        Deno.env.set(S_NAME__ENV__PATH__SERVER, s_path__tmp + '/elsewhere');
+        assert.deepEqual(f_o_checkout__server(s_path__root), { s_path: s_path__tmp + '/elsewhere', b_found: true });
+        // a folder named on the command line comes first
+        assert.deepEqual(f_o_checkout__server(s_path__root, s_path__tmp + '/MicroMatic_Server'), { s_path: s_path__tmp + '/MicroMatic_Server', b_found: true });
+        // its modules are imported by an address that keeps a space and a % in the path
+        assert.equal(f_s_url__file('/home/jonas/My Code/100%/config.module.js'), 'file:///home/jonas/My%20Code/100%25/config.module.js');
+    } finally {
+        if(s_env__before === undefined) Deno.env.delete(S_NAME__ENV__PATH__SERVER);
+        else Deno.env.set(S_NAME__ENV__PATH__SERVER, s_env__before);
+        await Deno.remove(s_path__tmp, { recursive: true });
+    }
 });
 
 Deno.test('the port of the application server: --port among its arguments, 8000 without', () => {
@@ -179,15 +218,22 @@ let f_wait = async function(f_b_done, s_what, n_ms = 20000){
     throw new Error('Timed out waiting for: ' + s_what);
 };
 
-// a stand-in for a server: listens on --port and says who answers. like the real
-// ones, the application server ends by the signal and the data server tidies up
-// and ends with exit code 0. --fail ends it by itself after a moment.
+// a stand-in for a server: listens on --port and says who answers, and on /cwd in
+// which folder it was started. like the real ones, the application server ends by
+// the signal and the data server tidies up and ends with exit code 0. --fail ends
+// it by itself after a moment.
 let s_server__stand_in = `
     let n_idx = Deno.args.indexOf('--port');
     let n_port = Number(n_idx === -1 ? Deno.env.get('DATASERVER_N_PORT') : Deno.args[n_idx + 1]);
     if(Deno.args.includes('--tidy')) Deno.addSignalListener('SIGTERM', () => Deno.exit(0));
-    Deno.serve({ hostname: '127.0.0.1', port: n_port, onListen() {} }, () => new Response(String(Deno.pid)));
+    Deno.serve({ hostname: '127.0.0.1', port: n_port, onListen() {} }, o_request => new Response(new URL(o_request.url).pathname === '/cwd' ? Deno.cwd() : String(Deno.pid)));
     if(Deno.args.includes('--fail')) setTimeout(() => { console.error('stand-in: out of luck'); Deno.exit(3); }, 400);
+`;
+
+// a stand-in for config.module.js of MicroMatic_Server: its port, read like the real one reads it
+let s_config__stand_in = `
+    let f_o_config = function(){ return { s_hostname: '127.0.0.1', n_port: Number(Deno.env.get('DATASERVER_N_PORT')) }; };
+    export { f_o_config };
 `;
 
 // a stand-in for the task that installs what is missing: says that it ran, and fails with --fail
@@ -198,14 +244,23 @@ let s_install__stand_in = `
 `;
 
 Deno.test('the launcher installs what is missing, starts both servers, starts them again when they run, and stops them', async () => {
-    let s_path__root = await Deno.realPath(await Deno.makeTempDir({ prefix: 'omm_launcher_' }));
+    let s_path__tmp = await Deno.realPath(await Deno.makeTempDir({ prefix: 'omm_launcher_' }));
+    // the two checkouts side by side, as the launcher expects them
+    let s_path__root = s_path__tmp + '/MicroMatic';
+    let s_path__server = s_path__tmp + '/MicroMatic_Server';
     let n_port__app = f_n_port__free();
     let n_port__data = f_n_port__free();
     let a_o_process = [];
-    let f_o_launcher = function(a_s_arg = []){
+    // the environment of this test, without MICROMATIC_S_PATH__SERVER: where the launcher looks for the server is set by each case
+    let f_o_env = function(o_env = {}){
+        let o_env__launcher = Deno.env.toObject();
+        delete o_env__launcher[S_NAME__ENV__PATH__SERVER];
+        return { ...o_env__launcher, DATASERVER_N_PORT: String(n_port__data), ...o_env };
+    };
+    let f_o_launcher = function(a_s_arg = [], o_env = {}){
         let o_process = new Deno.Command(Deno.execPath(), {
             args: ['run', '-A', s_path__repository + '/launcher/launcher_denojs.js', '--no-browser', '--root', s_path__root, ...a_s_arg],
-            env: { DATASERVER_N_PORT: String(n_port__data) }, stdin: 'null', stdout: 'piped', stderr: 'piped',
+            env: f_o_env(o_env), clearEnv: true, stdin: 'null', stdout: 'piped', stderr: 'piped',
         }).spawn();
         let o_launcher = { o_process, s_output: '' };
         // what it prints is read as it comes, so a full pipe never holds it up
@@ -216,27 +271,40 @@ Deno.test('the launcher installs what is missing, starts both servers, starts th
         return o_launcher;
     };
     let f_s_pid = async n_port => await (await fetch('http://127.0.0.1:' + n_port)).text();
+    let f_s_cwd = async n_port => await (await fetch('http://127.0.0.1:' + n_port + '/cwd')).text();
     let f_b_running = async () => (await f_b_port__open(n_port__app)) && (await f_b_port__open(n_port__data));
     let f_b_stopped = async () => !(await f_b_port__open(n_port__app)) && !(await f_b_port__open(n_port__data));
-    let f_write_task = (s_arg__app = '', s_arg__install = '') => Deno.writeTextFile(s_path__root + '/deno.json', JSON.stringify({ tasks: {
-        install_ml: 'deno run -A install_stand_in.js' + s_arg__install,
-        server: `deno run -A stand_in.js --port ${n_port__app}${s_arg__app}`,
-        dataserver: 'deno run -A stand_in.js --tidy',
-    } }));
+    // the data server and its installer are tasks of the server checkout
+    let f_write_checkout__server = async (s_path, s_arg__install = '') => {
+        await Deno.mkdir(s_path, { recursive: true });
+        await Deno.writeTextFile(s_path + '/stand_in.js', s_server__stand_in);
+        await Deno.writeTextFile(s_path + '/install_stand_in.js', s_install__stand_in);
+        await Deno.writeTextFile(s_path + '/config.module.js', s_config__stand_in);
+        await Deno.writeTextFile(s_path + '/deno.json', JSON.stringify({ tasks: {
+            install: 'deno run -A install_stand_in.js' + s_arg__install,
+            start: 'deno run -A stand_in.js --tidy',
+        } }));
+    };
+    let f_write_task = async (s_arg__app = '', s_arg__install = '') => {
+        await Deno.writeTextFile(s_path__root + '/deno.json', JSON.stringify({ tasks: { server: `deno run -A stand_in.js --port ${n_port__app}${s_arg__app}` } }));
+        await f_write_checkout__server(s_path__server, s_arg__install);
+    };
     try {
+        await Deno.mkdir(s_path__root);
         await Deno.writeTextFile(s_path__root + '/stand_in.js', s_server__stand_in);
-        await Deno.writeTextFile(s_path__root + '/install_stand_in.js', s_install__stand_in);
         await f_write_task();
 
-        // ── start: what is missing is installed first, in the folder of the checkout ──
+        // ── start: what is missing is installed first, in the folder of the server checkout next to this one ──
         let o_launcher__1 = f_o_launcher();
         await f_wait(f_b_running, 'both servers');
         await f_wait(() => o_launcher__1.s_output.includes('started.'), 'the launcher says so');
-        assert.equal(await Deno.readTextFile(s_path__root + '/installed.txt'), 'installed');
+        assert.equal(await Deno.readTextFile(s_path__server + '/installed.txt'), 'installed');
         assert.ok(o_launcher__1.s_output.indexOf('stand-in: installing') !== -1
             && o_launcher__1.s_output.indexOf('stand-in: installing') < o_launcher__1.s_output.indexOf('started.'), o_launcher__1.s_output);
         assert.equal(o_launcher__1.s_output.includes('not everything could be installed'), false, o_launcher__1.s_output);
         assert.ok(o_launcher__1.s_output.includes(`http://localhost:${n_port__app}`) && o_launcher__1.s_output.includes(`http://127.0.0.1:${n_port__data}`), o_launcher__1.s_output);
+        // each server runs in the folder of its checkout
+        assert.deepEqual([await f_s_cwd(n_port__app), await f_s_cwd(n_port__data)], [s_path__root, s_path__server]);
         let a_s_pid__1 = [await f_s_pid(n_port__app), await f_s_pid(n_port__data)];
 
         // ── start again: the running servers are stopped, new ones answer, the first launcher ends by itself ──
@@ -255,28 +323,28 @@ Deno.test('the launcher installs what is missing, starts both servers, starts th
         // ── a port held by another program is not touched: nothing is stopped, nothing is started ──
         // (a server of another checkout: it was started in another folder)
         let n_port__other = f_n_port__free();
-        let s_path__other = await Deno.realPath(await Deno.makeTempDir({ prefix: 'omm_launcher_other_' }));
+        let s_path__other = s_path__tmp + '/other';
+        await Deno.mkdir(s_path__other);
         await Deno.writeTextFile(s_path__other + '/stand_in.js', s_server__stand_in);
         let o_other = new Deno.Command(Deno.execPath(), { args: ['run', '-A', 'stand_in.js', '--port', String(n_port__other)], cwd: s_path__other, stdin: 'null', stdout: 'null', stderr: 'null' }).spawn();
         a_o_process.push(o_other);
         try {
             await f_wait(() => f_b_port__open(n_port__other), 'the other program');
             let s_pid__other = await f_s_pid(n_port__other);
-            let s_path__root__3 = await Deno.realPath(await Deno.makeTempDir({ prefix: 'omm_launcher_' }));
+            let s_path__root__3 = s_path__tmp + '/third/MicroMatic';
+            await Deno.mkdir(s_path__root__3, { recursive: true });
             await Deno.writeTextFile(s_path__root__3 + '/stand_in.js', s_server__stand_in);
-            await Deno.writeTextFile(s_path__root__3 + '/deno.json', JSON.stringify({ tasks: { server: `deno run -A stand_in.js --port ${n_port__other}`, dataserver: 'deno run -A stand_in.js --tidy' } }));
+            await Deno.writeTextFile(s_path__root__3 + '/deno.json', JSON.stringify({ tasks: { server: `deno run -A stand_in.js --port ${n_port__other}` } }));
             let o_output = await new Deno.Command(Deno.execPath(), {
-                args: ['run', '-A', s_path__repository + '/launcher/launcher_denojs.js', '--no-browser', '--root', s_path__root__3],
-                env: { DATASERVER_N_PORT: String(f_n_port__free()) }, stdin: 'null', stdout: 'piped', stderr: 'piped',
+                args: ['run', '-A', s_path__repository + '/launcher/launcher_denojs.js', '--no-browser', '--root', s_path__root__3, '--server-root', s_path__server],
+                env: f_o_env({ DATASERVER_N_PORT: String(f_n_port__free()) }), clearEnv: true, stdin: 'null', stdout: 'piped', stderr: 'piped',
             }).output();
             assert.equal(o_output.code, 1);
             assert.match(new TextDecoder().decode(o_output.stderr), new RegExp(`Port ${n_port__other} of the application is used by another program \\(process ${s_pid__other}\\)`));
             assert.equal(await f_s_pid(n_port__other), s_pid__other, 'the other program still runs');
-            await Deno.remove(s_path__root__3, { recursive: true });
         } finally {
             o_other.kill('SIGKILL');
             await o_other.status;
-            await Deno.remove(s_path__other, { recursive: true });
         }
         assert.deepEqual([await f_s_pid(n_port__app), await f_s_pid(n_port__data)], a_s_pid__2, 'the servers of the second launcher were not touched');
 
@@ -286,28 +354,52 @@ Deno.test('the launcher installs what is missing, starts both servers, starts th
         assert.equal(o_status__2.code, 0, o_launcher__2.s_output);
         await f_wait(f_b_stopped, 'both servers stopped');
 
+        // ── no server checkout where MICROMATIC_S_PATH__SERVER says: only the application starts, and the launcher says why ──
+        await f_write_task();
+        let s_path__nowhere = s_path__tmp + '/nowhere';
+        let o_launcher__3 = f_o_launcher([], { [S_NAME__ENV__PATH__SERVER]: s_path__nowhere });
+        // (the line that says why contains "started." too)
+        await f_wait(() => o_launcher__3.s_output.includes('\n  started.'), 'the application alone');
+        assert.ok(o_launcher__3.s_output.includes(`no MicroMatic_Server in ${s_path__nowhere}: only the application is started. the ML Training window needs MicroMatic_Server next to this checkout.`), o_launcher__3.s_output);
+        assert.deepEqual([await f_b_port__open(n_port__app), await f_b_port__open(n_port__data), o_launcher__3.s_output.includes('stand-in: installing')], [true, false, false], o_launcher__3.s_output);
+        assert.ok(o_launcher__3.s_output.includes('press Ctrl+C to stop it.'), o_launcher__3.s_output);
+        o_launcher__3.o_process.kill('SIGHUP');
+        assert.equal((await o_launcher__3.o_process.status).code, 0, o_launcher__3.s_output);
+        await f_wait(f_b_stopped, 'the application stopped');
+
+        // ── --server-root names the server checkout, before MICROMATIC_S_PATH__SERVER ──
+        let s_path__server__2 = s_path__tmp + '/elsewhere/Server';
+        await f_write_checkout__server(s_path__server__2);
+        let o_launcher__4 = f_o_launcher(['--server-root', s_path__server__2], { [S_NAME__ENV__PATH__SERVER]: s_path__nowhere });
+        await f_wait(() => o_launcher__4.s_output.includes('started.'), 'both servers, the data server of the other checkout');
+        assert.deepEqual([await f_s_cwd(n_port__app), await f_s_cwd(n_port__data)], [s_path__root, s_path__server__2]);
+        assert.equal(await Deno.readTextFile(s_path__server__2 + '/installed.txt'), 'installed');
+        o_launcher__4.o_process.kill('SIGHUP');
+        assert.equal((await o_launcher__4.o_process.status).code, 0, o_launcher__4.s_output);
+        await f_wait(f_b_stopped, 'both servers stopped');
+
         // ── a server that ends by itself: the other one is stopped, and the reason is said ──
         await f_write_task(' --fail');
-        let o_launcher__4 = f_o_launcher();
-        let o_status__4 = await o_launcher__4.o_process.status;
-        assert.equal(o_status__4.code, 1, o_launcher__4.s_output);
-        assert.match(o_launcher__4.s_output, /stand-in: out of luck[\s\S]*The application ended \(exit code 3\)/);
+        let o_launcher__5 = f_o_launcher();
+        let o_status__5 = await o_launcher__5.o_process.status;
+        assert.equal(o_status__5.code, 1, o_launcher__5.s_output);
+        assert.match(o_launcher__5.s_output, /stand-in: out of luck[\s\S]*The application ended \(exit code 3\)/);
         await f_wait(f_b_stopped, 'nothing left running');
 
         // ── a task that needs a shell is refused with the reason ──
-        await Deno.writeTextFile(s_path__root + '/deno.json', JSON.stringify({ tasks: { server: 'deno run -A a.js && deno run -A b.js', dataserver: 'deno run -A stand_in.js --tidy' } }));
-        let o_launcher__5 = f_o_launcher();
-        assert.equal((await o_launcher__5.o_process.status).code, 1);
-        assert.match(o_launcher__5.s_output, /The task "server" of deno\.json is missing or is more than one plain deno command/);
+        await Deno.writeTextFile(s_path__root + '/deno.json', JSON.stringify({ tasks: { server: 'deno run -A a.js && deno run -A b.js' } }));
+        let o_launcher__6 = f_o_launcher();
+        assert.equal((await o_launcher__6.o_process.status).code, 1);
+        assert.ok(o_launcher__6.s_output.includes(`The task "server" of deno.json in ${s_path__root} is missing or is more than one plain deno command`), o_launcher__6.s_output);
     } finally {
         for(let o_process of a_o_process){
             try { o_process.kill('SIGKILL'); } catch { /* ended already */ }
             await o_process.status;
         }
         // servers a failed run may have left behind
-        let o_left = await f_o_output('pkill', ['-KILL', '-f', s_path__root + '/']);
+        let o_left = await f_o_output('pkill', ['-KILL', '-f', s_path__tmp + '/']);
         void o_left;
-        await Deno.remove(s_path__root, { recursive: true }).catch(() => {});
+        await Deno.remove(s_path__tmp, { recursive: true }).catch(() => {});
     }
 });
 

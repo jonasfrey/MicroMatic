@@ -2,31 +2,41 @@
 // run: deno task launch     (or "MicroMatic" in the application menu, see install.js)
 //
 // starts the application server and the data server in this terminal and opens
-// the application in the browser. servers of this checkout that are running
-// already are stopped first: starting again is a restart.
+// the application in the browser. the data server is MicroMatic Server, a
+// separate program in a checkout of its own (micromatic_server.module.js says
+// where); without that checkout only the application is started.
+// each server runs in the folder of its checkout. servers of these checkouts
+// that are running already are stopped first: starting again is a restart.
 // before the servers start, what the data server needs for training and
-// prediction is installed when it is missing (the task "install_ml").
+// prediction is installed when it is missing (the task "install" of MicroMatic_Server).
 // closing the terminal window or Ctrl+C stops both.
 //
-//   --no-browser     do not open the browser
-//   --root <folder>  the checkout whose tasks "install_ml", "server" and "dataserver"
-//                    are run (default: the checkout this file lies in)
+//   --no-browser            do not open the browser
+//   --root <folder>         the MicroMatic checkout whose task "server" is run
+//                           (default: the checkout this file lies in)
+//   --server-root <folder>  the MicroMatic_Server checkout whose tasks "install" and
+//                           "start" are run (default: MICROMATIC_S_PATH__SERVER, else
+//                           MicroMatic_Server next to the MicroMatic checkout)
 
-import { f_o_config } from '../dataserver/config.module.js';
 import { A_S_NAME__BROWSER, f_a_s_arg__task, f_n_port__app, f_a_n_pid__listening } from './launcher.module.js';
+import { f_o_checkout__server, f_s_url__file } from '../micromatic_server.module.js';
 
-// run before the servers start. with everything in place it only reads what is
-// installed and is done in a moment, so every start can afford it.
-let S_NAME__TASK__INSTALL = 'install_ml';
+// run in the server checkout before the servers start. with everything in place
+// it only reads what is installed and is done in a moment, so every start can afford it.
+let S_NAME__TASK__INSTALL = 'install';
 let N_MS__START_TIMEOUT = 120 * 1000;
 let N_MS__STOP_TIMEOUT = 5 * 1000;
 let N_MS__POLL = 150;
 
+// the value after an option, '' without one
+let f_s_arg = function(s_name){
+    let n_idx = Deno.args.indexOf(s_name);
+    return n_idx !== -1 && Deno.args[n_idx + 1] ? Deno.args[n_idx + 1] : '';
+};
+
 let b_browser = !Deno.args.includes('--no-browser');
-let n_idx__root = Deno.args.indexOf('--root');
-let s_path__root = Deno.realPathSync(n_idx__root !== -1 && Deno.args[n_idx__root + 1]
-    ? Deno.args[n_idx__root + 1]
-    : decodeURIComponent(new URL('..', import.meta.url).pathname));
+let s_path__root = Deno.realPathSync(f_s_arg('--root') || decodeURIComponent(new URL('..', import.meta.url).pathname));
+let o_checkout__server = f_o_checkout__server(s_path__root, f_s_arg('--server-root'));
 
 let f_log = function(s_message){
     console.log('  ' + s_message);
@@ -38,24 +48,32 @@ let f_sleep = function(n_ms){
 
 // ─── Which servers ──────────────────────────────────────────────────
 
-let f_o_task = async function(){
-    return JSON.parse(await Deno.readTextFile(s_path__root + '/deno.json')).tasks || {};
+let f_o_task = async function(s_path){
+    return JSON.parse(await Deno.readTextFile(s_path + '/deno.json')).tasks || {};
 };
 
-// the tasks the servers are started with by hand are the ones started here
-let f_a_o_server = function(o_task){
-    let f_a_s_arg = function(s_name__task){
+// the tasks the servers are started with by hand are the ones started here:
+// "server" of MicroMatic, "start" of MicroMatic_Server. o_task__data: null
+// without the server checkout.
+let f_a_o_server = async function(o_task__app, o_task__data){
+    let f_a_s_arg = function(o_task, s_name__task, s_path){
         let a_s_arg = f_a_s_arg__task(o_task[s_name__task]);
-        if(!a_s_arg) throw new Error(`The task "${s_name__task}" of deno.json is missing or is more than one plain deno command. The launcher cannot start it.`);
+        if(!a_s_arg) throw new Error(`The task "${s_name__task}" of deno.json in ${s_path} is missing or is more than one plain deno command. The launcher cannot start it.`);
         return a_s_arg;
     };
-    let o_config__data = f_o_config();
-    let a_s_arg__app = f_a_s_arg('server');
+    let a_s_arg__app = f_a_s_arg(o_task__app, 'server', s_path__root);
     let n_port__app = f_n_port__app(a_s_arg__app);
-    return [
-        { s_name: 'application', a_s_arg: a_s_arg__app, s_hostname: '127.0.0.1', n_port: n_port__app, s_url: 'http://localhost:' + n_port__app },
-        { s_name: 'data server', a_s_arg: f_a_s_arg('dataserver'), s_hostname: o_config__data.s_hostname, n_port: o_config__data.n_port, s_url: `http://${o_config__data.s_hostname}:${o_config__data.n_port}` },
+    let a_o_server = [
+        { s_name: 'application', a_s_arg: a_s_arg__app, s_path__root, s_hostname: '127.0.0.1', n_port: n_port__app, s_url: 'http://localhost:' + n_port__app },
     ];
+    if(!o_task__data) return a_o_server;
+    // hostname and port as the data server reads them itself, its environment variables included
+    let o_config__data = (await import(f_s_url__file(o_checkout__server.s_path + '/config.module.js'))).f_o_config();
+    a_o_server.push({
+        s_name: 'data server', a_s_arg: f_a_s_arg(o_task__data, 'start', o_checkout__server.s_path), s_path__root: o_checkout__server.s_path,
+        s_hostname: o_config__data.s_hostname, n_port: o_config__data.n_port, s_url: `http://${o_config__data.s_hostname}:${o_config__data.n_port}`,
+    });
+    return a_o_server;
 };
 
 // ─── Ports and processes ────────────────────────────────────────────
@@ -79,10 +97,10 @@ let f_a_n_pid__on_port = async function(n_port){
     }
 };
 
-// a server of this checkout: it was started in its folder
-let f_b_process__own = function(n_pid){
+// a server of the checkout it is started from here: it was started in that folder
+let f_b_process__own = function(n_pid, o_server){
     try {
-        return Deno.realPathSync(`/proc/${n_pid}/cwd`) === s_path__root;
+        return Deno.realPathSync(`/proc/${n_pid}/cwd`) === o_server.s_path__root;
     } catch {
         return false;
     }
@@ -103,14 +121,14 @@ let f_b_wait_closed = async function(a_o_server, n_ms){
     return false;
 };
 
-// stop the servers of this checkout that are running. true when there were any.
+// stop the servers of these checkouts that are running. true when there were any.
 // a port held by another program is not touched: that is said and nothing is started.
 let f_b_stop_running = async function(a_o_server){
     let a_n_pid = [];
     for(let o_server of a_o_server){
         let a_n_pid__port = await f_a_n_pid__on_port(o_server.n_port);
         for(let n_pid of a_n_pid__port){
-            if(!f_b_process__own(n_pid)){
+            if(!f_b_process__own(n_pid, o_server)){
                 throw new Error(`Port ${o_server.n_port} of the ${o_server.s_name} is used by another program (process ${n_pid}). Stop it, then start MicroMatic again.`);
             }
             a_n_pid.push(n_pid);
@@ -159,16 +177,16 @@ let f_open_browser = async function(s_url){
 
 // ─── Install ────────────────────────────────────────────────────────
 
-// run the install task of the checkout and wait for it. a checkout without
-// one is started as it is. what could not be installed does not keep the
-// servers from starting: the application says which model cannot be trained.
-let f_install = async function(o_task, s_path){
-    let a_s_arg = f_a_s_arg__task(o_task[S_NAME__TASK__INSTALL]);
+// run the install task of the server checkout and wait for it. a checkout
+// without one is started as it is. what could not be installed does not keep
+// the servers from starting: the application says which model cannot be trained.
+let f_install = async function(o_task__data, s_path){
+    let a_s_arg = f_a_s_arg__task(o_task__data[S_NAME__TASK__INSTALL]);
     if(!a_s_arg) return;
     let b_success = false;
     try {
         b_success = (await new Deno.Command(Deno.execPath(), {
-            args: a_s_arg, cwd: s_path__root, env: { PATH: s_path }, stdin: 'null', stdout: 'inherit', stderr: 'inherit',
+            args: a_s_arg, cwd: o_checkout__server.s_path, env: { PATH: s_path }, stdin: 'null', stdout: 'inherit', stderr: 'inherit',
         }).spawn().status).success;
     } catch { /* said below */ }
     if(!b_success) f_log('not everything could be installed, see above. the servers are started all the same.');
@@ -199,17 +217,20 @@ let f_exit = async function(n_code, s_message){
 let f_run = async function(){
     if(Deno.stdout.isTerminal()) await Deno.stdout.write(new TextEncoder().encode('\x1b]0;MicroMatic\x07'));
     console.log('\n  MicroMatic\n');
-    let o_task = await f_o_task();
-    let a_o_server = f_a_o_server(o_task);
+    let o_task__data = o_checkout__server.b_found ? await f_o_task(o_checkout__server.s_path) : null;
+    if(!o_task__data){
+        f_log(`no MicroMatic_Server in ${o_checkout__server.s_path}: only the application is started. the ML Training window needs MicroMatic_Server next to this checkout.`);
+    }
+    let a_o_server = await f_a_o_server(await f_o_task(s_path__root), o_task__data);
     let b_restart = await f_b_stop_running(a_o_server);
 
     // the servers find deno and what the installer put next to it, also when the desktop started this
     let s_path = [Deno.execPath().replace(/\/[^/]*$/, ''), Deno.env.get('PATH') || ''].join(':');
-    await f_install(o_task, s_path);
+    if(o_task__data) await f_install(o_task__data, s_path);
     let a_o_end = [];
     for(let o_server of a_o_server){
         let o_process = new Deno.Command(Deno.execPath(), {
-            args: o_server.a_s_arg, cwd: s_path__root, env: { PATH: s_path }, stdin: 'null', stdout: 'inherit', stderr: 'inherit',
+            args: o_server.a_s_arg, cwd: o_server.s_path__root, env: { PATH: s_path }, stdin: 'null', stdout: 'inherit', stderr: 'inherit',
         }).spawn();
         a_o_process.push(o_process);
         a_o_end.push(o_process.status.then(function(o_status){ return { o_server, o_status }; }));
@@ -234,7 +255,8 @@ let f_run = async function(){
     if(b_ready){
         for(let o_server of a_o_server) f_log(`${o_server.s_name.padEnd(12)} ${o_server.s_url}`);
         f_log(b_restart ? 'started again.' : 'started.');
-        f_log('close this window or press Ctrl+C to stop both. start MicroMatic again to restart them.\n');
+        let b_both = a_o_server.length > 1;
+        f_log(`close this window or press Ctrl+C to stop ${b_both ? 'both' : 'it'}. start MicroMatic again to restart ${b_both ? 'them' : 'it'}.\n`);
         if(b_browser) await f_open_browser(a_o_server[0].s_url);
     }
 

@@ -31,7 +31,7 @@ installed on first run (skipped afterwards, so `deno task start` stays fast):
 - `torch` (cpu build) + `lightglue` + `kornia` — used by `autostitch.py` and by `stitch.py --matcher loftr`
 - linux only: `v4l2-ctl` (system package `v4l-utils`, installed with `sudo`, which may ask for your password) — gives the Camera window the real sensor sizes of the camera and the controls the browser cannot reach (ISO). on other systems the Camera window works without them
 - linux only: the entry `MicroMatic` in the application menu (`~/.local/share/applications/micromatic.desktop`) and the same entry as an icon on the desktop — press the Super key and type `MicroMatic`, or open the icon: a terminal window starts the application and the data server and opens the browser. started again while they are running, it restarts them; closing the window stops both. `deno task launch` does the same from a terminal. `deno task install --skip-desktop` leaves menu and desktop alone; deleting the two files removes the entry
-- `./venv_yolo` with `ultralytics`, `yolox` and `rfdetr` — training and prediction of the ML Training window (`dataserver/install_ml.js`). the first run downloads a few GB. the `MicroMatic` entry runs this step too, every time before it starts the servers
+- the detection libraries of MicroMatic Server, when its checkout lies next to this one (`../MicroMatic_Server`, or the folder in `MICROMATIC_S_PATH__SERVER`). the ML Training window talks over HTTP to MicroMatic Server, a separate proprietary program with its own licence and third-party notices; everything else works without it. the `MicroMatic` entry starts it and runs this step too, every time before it starts the servers
 - linux only: a check of the browser. Chromium from the Snap store (Ubuntu) sees no USB devices, so the ESP32 is missing in its list; the installer says so and how to change it (`sudo snap connect chromium:raw-usb`, or Google Chrome)
 
 the installer also runs `stitch.py --help` inside the venv, so a broken numpy/opencv
@@ -46,11 +46,10 @@ install is reported before a scan is started rather than after it.
 | `deno task install` | install only, do not start the server |
 | `deno task server` | start the server without the dependency check |
 | `deno task flash` | the guided flashing wizard (`startup.js`) |
-| `deno task dataserver` | start the data server for the ML Training window, see `dataserver/readme_mgc.md` |
 
 `deno task install --skip-stitch-ai` leaves out torch/lightglue/kornia if you do not need
 autostitch or the LoFTR rescue matcher. `stitch.py` itself only needs numpy + opencv.
-`--skip-ml` leaves out `./venv_yolo` if you do not need the ML Training window.
+`--skip-ml` leaves out the detection libraries of MicroMatic Server if you do not need the ML Training window.
 
 ## hardware setup and browser flashing
 
